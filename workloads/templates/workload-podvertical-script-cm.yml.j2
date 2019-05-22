@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    # pbench Configuration
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/master= | grep master | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/infra= | grep infra | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    # End pbench Configuration
+
+    # Test Configuration
+    echo "$(date -u) Configuring Pod Vertical"
+    mkdir -p /root/tests/clc
+    mkdir -p /root/tests/content
+    cp /root/cm-script/podvertical.yaml /root/tests/clc/podvertical.yaml
+    cp /root/cm-script/pod-pause.json /root/tests/content/pod-pause.json
+    echo "$(date -u) Done Configuring Pod Vertical"
+    # End Test Configuration
+
+    # Start of Test Code
+    echo "$(date -u) Running Pod Vertical"
+    export KUBECONFIG=/root/.kube/config
+    cd /root/tests
+    pbench-user-benchmark -- 'VIPERCONFIG=clc/podvertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-copy-results --prefix {{podvertical_test_prefix}}
+    echo "$(date -u) Completed Pod Vertical"
+    # End of Test Code
+  podvertical.yaml: |
+    provider: local
+    ClusterLoader:
+      projects:
+        - num: 1
+          basename: clusterproject
+          tuning: default
+          ifexists: reuse
+          pods:
+            - num: {{podvertical_maxpods}}
+              image: gcr.io/google_containers/pause-amd64:3.0
+              basename: pausepods
+              file: pod-pause.json
+      tuningsets:
+        - name: default
+          pods:
+            stepping:
+              stepsize: {{podvertical_stepsize}}
+              pause: {{podvertical_pause}}
+            ratelimit:
+              delay: 0
+  pod-pause.json: |
+    {
+      "kind": "Pod",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "pause-amd64",
+        "creationTimestamp": null,
+        "labels": {
+          "name": "pause-amd64"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "pause-amd64",
+            "image": "gcr.io/google_containers/pause-amd64:3.0",
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP"
+              }
+            ],
+            "terminationMessagePath": "/dev/termination-log",
+            "imagePullPolicy": "IfNotPresent",
+            "capabilities": {},
+            "securityContext": {
+              "capabilities": {},
+              "privileged": false
+            }
+          }
+        ],
+        "restartPolicy": "Always",
+        "dnsPolicy": "ClusterFirst",
+        "serviceAccount": ""
+      },
+      "status": {}
+    }

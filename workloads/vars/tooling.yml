@@ -1,0 +1,22 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# RHCOS tooling variables.
+###############################################################################
+
+# Container image for pbench
+pbench_image: "{{ lookup('env', 'PBENCH_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+# Kubeconfig for tooling container script
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pbench-agent-infra-tools
+data:
+  disk: ""
+  iostat: ""
+  label: "infra"
+  mpstat: ""
+  perf: ""
+  pidstat: ""

@@ -1,0 +1,128 @@
+---
+#
+# Sets up scale-ci-tooling on an existing cluster
+#
+
+- name: Sets up scale-ci-tooling
+  hosts: orchestration
+  gather_facts: true
+  remote_user: "{{orchestration_user}}"
+  vars_files:
+    - vars/tooling.yml
+  tasks:
+    - name: Create scale-ci-tooling directory
+      file:
+        path: "{{ansible_user_dir}}/scale-ci-tooling"
+        state: directory
+
+    - name: Copy tooling files
+      copy:
+        src: "{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - src: scale-ci-tooling-ns.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
+        - src: pbench-agent-infra-tools.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-infra-tools.yml"
+        - src: pbench-agent-master-tools.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-master-tools.yml"
+        - src: pbench-agent-worker-tools.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-worker-tools.yml"
+
+    - name: Slurp kubeconfig file
+      slurp:
+        src: "{{kubeconfig_file}}"
+      register: kubeconfig_file_slurp
+
+    - name: Slurp ssh private key file
+      slurp:
+        src: "{{pbench_ssh_private_key_file}}"
+      register: pbench_ssh_private_key_file_slurp
+
+    - name: Slurp ssh public key file
+      slurp:
+        src: "{{pbench_ssh_public_key_file}}"
+      register: pbench_ssh_public_key_file_slurp
+
+    - name: Template tooling templates
+      template:
+        src: "{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - src: pbench-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-cm.yml"
+        - src: pbench-ssh-secret.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-ssh-secret.yml"
+        - src: kubeconfig-secret.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
+        - src: pbench-infra-ds.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-infra-ds.yml"
+        - src: pbench-master-ds.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-master-ds.yml"
+        - src: pbench-worker-ds.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-worker-ds.yml"
+
+    - name: Check if scale-ci-tooling namespace exists
+      shell: |
+        oc get projects | grep "scale-ci-tooling"
+      ignore_errors: true
+      changed_when: false
+      register: scale_ci_tooling_ns_exists
+
+    # Known issue with waiting for delete - https://bugzilla.redhat.com/show_bug.cgi?id=1704284
+    - name: Delete scale-ci-tooling namespace
+      shell: |
+        oc delete project --wait scale-ci-tooling
+      when:
+        - scale_ci_tooling_ns_exists.rc == 0
+
+    - name: Create tooling namespace
+      shell: |
+        oc create -f {{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml
+
+    - name: Create tooling service account
+      shell: |
+        oc create serviceaccount useroot -n scale-ci-tooling
+        oc adm policy add-scc-to-user privileged -z useroot -n scale-ci-tooling
+
+    - name: Remove pbench_agent label from nodes
+      shell: |
+        oc label nodes -l pbench_agent=true pbench_agent-
+
+    - name: Label master nodes
+      shell: |
+        oc label nodes --overwrite -l 'node-role.kubernetes.io/master=' pbench_agent=true
+
+    - name: Label infra nodes
+      shell: |
+        oc label nodes --overwrite -l 'node-role.kubernetes.io/infra=' pbench_agent=true
+
+    - name: Label two worker nodes
+      shell: |
+        oc get nodes | grep worker | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % --overwrite pbench_agent=true
+
+    - name: Create kubeconfig secret
+      shell: |
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
+
+    - name: Create pbench ssh secret
+      shell: |
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-ssh-secret.yml"
+
+    - name: Create pbench configmap
+      shell: |
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-cm.yml"
+
+    - name: Create pbench-agent tools configmaps
+      shell: |
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-infra-tools.yml"
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-master-tools.yml"
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-agent-worker-tools.yml"
+
+    - name: Create pbench-agent daemonsets
+      shell: |
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-infra-ds.yml"
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-master-ds.yml"
+        oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-worker-ds.yml"
+
+    # Need wait for daemonsets to be ready

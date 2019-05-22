@@ -1,0 +1,119 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scale-ci-{{workload_job}}
+  labels:
+    name: scale-ci-workload
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  template:
+    metadata:
+      name: scale-ci-workload
+    spec:
+      restartPolicy: Never
+{% if workload_job == "nodevertical" %}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nodevertical
+                operator: DoesNotExist
+{% endif %}
+{% if enable_pbench_agents %}
+      serviceAccountName: useroot
+      hostNetwork: true
+{% endif %}
+      containers:
+      - name: scale-ci-workload
+        image: "{{workload_image}}"
+        imagePullPolicy: Always
+        securityContext:
+          privileged: {{workload_job_privileged}}
+        command:
+        - /root/cm-script/run.sh
+        volumeMounts:
+        - name: cm-script
+          mountPath: /root/cm-script/
+        - name: kube-config
+          mountPath: /root/.kube
+        - name: pbench-config
+          mountPath: /opt/pbench-agent/config/
+        - name: pbench-ssh
+          mountPath: /root/.ssh/authorized_keys
+          subPath: authorized_keys
+        - name: pbench-ssh
+          mountPath: /root/.ssh/id_rsa
+          subPath: id_rsa
+        - name: pbench-ssh
+          mountPath: /root/.ssh/id_rsa.pub
+          subPath: id_rsa.pub
+        - name: pbench-results
+          mountPath: /var/lib/pbench-agent
+
+        - name: pbench-ssh
+          mountPath: /opt/pbench-agent/id_rsa
+          subPath: id_rsa
+
+        - name: test-config
+          mountPath: /root/tests
+
+{% if enable_pbench_agents %}
+        - name: ocp-volumes
+          mountPath: /var/lib/kubelet/pods
+        - name: proc-mount
+          mountPath: /proc_host
+{% endif %}
+{% if enable_pbench_agents %}
+        ports:
+        - containerPort: 2022
+        env:
+        - name: ENABLE_PBENCH_AGENTS
+          value: "true"
+{% endif %}
+      volumes:
+      - name: cm-script
+        configMap:
+          name: scale-ci-workload-script
+          defaultMode: 0744
+      - name: kube-config
+        secret:
+          secretName: kubeconfig
+      - name: pbench-config
+        configMap:
+          name: scale-ci-pbench-config
+      - name: pbench-ssh
+        secret:
+          secretName: pbench-ssh
+          defaultMode: 0600
+      - name: test-config
+        emptyDir: {}
+
+{% if enable_pbench_agents %}
+
+      - name: pbench-results
+        hostPath:
+          path: /var/lib/pbench-agent
+      - name: ocp-volumes
+        hostPath:
+          path: /var/lib/kubelet/pods
+      - name: proc-mount
+        hostPath:
+          path: /proc
+{% else %}
+      - name: pbench-results
+        emptyDir: {}
+{% endif %}
+{% if workload_job_node_selector %}
+      nodeSelector:
+        node-role.kubernetes.io/pbench: ""
+{% endif %}
+{% if workload_job_taint %}
+      tolerations:
+      - key: "role"
+        value: "controller"
+        operator: "Equal"
+        effect: "NoSchedule"
+{% endif %}

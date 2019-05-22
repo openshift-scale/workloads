@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pbench-agent-master-tools
+data:
+  disk: ""
+  iostat: ""
+  label: "master"
+  mpstat: ""
+  oc: ""
+  perf: ""
+  pidstat: ""

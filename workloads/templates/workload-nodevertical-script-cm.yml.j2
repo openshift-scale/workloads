@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    # pbench Configuration
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/master= | grep master | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/infra= | grep infra | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    # End pbench Configuration
+
+    # Test Configuration
+    echo "$(date -u) Configuring Node Vertical"
+    mkdir -p /root/tests/clc
+    mkdir -p /root/tests/content
+    cp /root/cm-script/nodevertical.yaml /root/tests/clc/nodevertical.yaml
+    cp /root/cm-script/pod-pause-labeled-nodes.json /root/tests/content/pod-pause-labeled-nodes.json
+    echo "$(date -u) Done Configuring Node Vertical"
+    # End Test Configuration
+
+    # Start of Test Code
+    echo "$(date -u) Running Node Vertical"
+    export KUBECONFIG=/root/.kube/config
+    cd /root/tests
+    pbench-user-benchmark -- 'VIPERCONFIG=clc/nodevertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-copy-results --prefix {{nodevertical_test_prefix}}
+    echo "$(date -u) Completed Node Vertical"
+    # End of Test Code
+  nodevertical.yaml: |
+    provider: local
+    ClusterLoader:
+      cleanup: true
+      projects:
+        - num: 1
+          basename: nodevertical
+          tuning: default
+          ifexists: delete
+          pods:
+            - num: {{total_pod_count.stdout|int}}
+              image: gcr.io/google_containers/pause-amd64:3.0
+              basename: pausepods
+              file: pod-pause-labeled-nodes.json
+      tuningsets:
+        - name: default
+          pods:
+            stepping:
+              stepsize: {{nodevertical_stepsize}}
+              pause: {{nodevertical_pause}}
+            ratelimit:
+              delay: 0
+  pod-pause-labeled-nodes.json: |
+    {
+      "kind": "Pod",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "pause-amd64",
+        "creationTimestamp": null,
+        "labels": {
+          "name": "pause-amd64"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "pause-amd64",
+            "image": "gcr.io/google_containers/pause-amd64:3.0",
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP"
+              }
+            ],
+            "terminationMessagePath": "/dev/termination-log",
+            "imagePullPolicy": "IfNotPresent",
+            "capabilities": {
+            },
+            "securityContext": {
+              "capabilities": {
+              },
+              "privileged": false
+            }
+          }
+        ],
+        "restartPolicy": "Always",
+        "dnsPolicy": "ClusterFirst",
+        "serviceAccount": "",
+        "nodeSelector": {
+          "nodevertical": "true"
+        }
+      },
+      "status": {
+      }
+    }

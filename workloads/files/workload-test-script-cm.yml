@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    # pbench Configuration
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/master= | grep master | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/infra= | grep infra | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    # End pbench Configuration
+
+    # Test Configuration
+    echo "$(date -u) Test ssh script"
+    # No configuration for this script
+    # End Test Configuration
+
+    # Start of Test Code
+    /usr/bin/ssh-keygen -A
+    /usr/sbin/sshd -D &
+    echo "$(date -u) sleeping forever"
+    sleep infinity
+    # End of Test Code
