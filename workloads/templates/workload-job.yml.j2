@@ -33,11 +33,11 @@ spec:
         securityContext:
           privileged: {{workload_job_privileged}}
         command:
-        - /root/cm-script/run.sh
+        - /root/workload/run.sh
         volumeMounts:
-        - name: cm-script
-          mountPath: /root/cm-script/
-        - name: kube-config
+        - name: workload-script
+          mountPath: /root/workload/
+        - name: kubeconfig
           mountPath: /root/.kube
         - name: pbench-config
           mountPath: /opt/pbench-agent/config/
@@ -50,15 +50,11 @@ spec:
         - name: pbench-ssh
           mountPath: /root/.ssh/id_rsa.pub
           subPath: id_rsa.pub
-        - name: pbench-results
-          mountPath: /var/lib/pbench-agent
-
         - name: pbench-ssh
           mountPath: /opt/pbench-agent/id_rsa
           subPath: id_rsa
-
-        - name: test-config
-          mountPath: /root/tests
+        - name: pbench-results
+          mountPath: /var/lib/pbench-agent
 
 {% if enable_pbench_agents %}
         - name: ocp-volumes
@@ -74,11 +70,11 @@ spec:
           value: "true"
 {% endif %}
       volumes:
-      - name: cm-script
+      - name: workload-script
         configMap:
           name: scale-ci-workload-script
           defaultMode: 0744
-      - name: kube-config
+      - name: kubeconfig
         secret:
           secretName: kubeconfig
       - name: pbench-config
@@ -88,11 +84,8 @@ spec:
         secret:
           secretName: pbench-ssh
           defaultMode: 0600
-      - name: test-config
-        emptyDir: {}
 
 {% if enable_pbench_agents %}
-
       - name: pbench-results
         hostPath:
           path: /var/lib/pbench-agent

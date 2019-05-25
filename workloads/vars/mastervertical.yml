@@ -34,6 +34,6 @@ scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', 
 
 # MasterVertical workload specific parameters:
 mastervertical_test_prefix: "{{ lookup('env', 'MASTERVERTICAL_TEST_PREFIX')|default('mastervertical', true) }}"
-mastervertical_projects: "{{ lookup('env', 'MASTERVERTICAL_PROJECTS')|default(1000, true)|int }}"
+mastervertical_cleanup: "{{ lookup('env', 'MASTERVERTICAL_CLEANUP')|default(true, true)|bool|lower }}"
 mastervertical_basename: "{{ lookup('env', 'MASTERVERTICAL_BASENAME')|default('mastervert0', true) }}"
-mastervertical_cleanup: "{{ lookup('env', 'MASTERVERTICAL_CLEANUP')|default(true, true)|bool }}"
+mastervertical_projects: "{{ lookup('env', 'MASTERVERTICAL_PROJECTS')|default(1000, true)|int }}"

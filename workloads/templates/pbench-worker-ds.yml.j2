@@ -27,7 +27,7 @@ spec:
         - /usr/lib/systemd/systemd
         - --system
         volumeMounts:
-        - name: kube-config
+        - name: kubeconfig
           mountPath: /root/.kube
         - name: pbench-ssh
           mountPath: /root/.ssh/authorized_keys
@@ -52,7 +52,7 @@ spec:
         ports:
         - containerPort: 2022
       volumes:
-      - name: kube-config
+      - name: kubeconfig
         secret:
           secretName: kubeconfig
       - name: pbench-ssh

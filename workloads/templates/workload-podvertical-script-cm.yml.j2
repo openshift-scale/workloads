@@ -34,17 +34,17 @@ data:
 
     # Test Configuration
     echo "$(date -u) Configuring Pod Vertical"
-    mkdir -p /root/tests/clc
-    mkdir -p /root/tests/content
-    cp /root/cm-script/podvertical.yaml /root/tests/clc/podvertical.yaml
-    cp /root/cm-script/pod-pause.json /root/tests/content/pod-pause.json
+    mkdir -p /tmp/tests/clc
+    mkdir -p /tmp/tests/content
+    cp /root/workload/podvertical.yaml /tmp/tests/clc/podvertical.yaml
+    cp /root/workload/pod-pause.json /tmp/tests/content/pod-pause.json
     echo "$(date -u) Done Configuring Pod Vertical"
     # End Test Configuration
 
     # Start of Test Code
     echo "$(date -u) Running Pod Vertical"
     export KUBECONFIG=/root/.kube/config
-    cd /root/tests
+    cd /tmp/tests
     pbench-user-benchmark -- 'VIPERCONFIG=clc/podvertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{podvertical_test_prefix}}
     echo "$(date -u) Completed Pod Vertical"
@@ -52,14 +52,15 @@ data:
   podvertical.yaml: |
     provider: local
     ClusterLoader:
+      cleanup: {{podvertical_cleanup}}
       projects:
         - num: 1
-          basename: clusterproject
+          basename: {{podvertical_basename}}
           tuning: default
-          ifexists: reuse
+          ifexists: delete
           pods:
             - num: {{podvertical_maxpods}}
-              image: gcr.io/google_containers/pause-amd64:3.0
+              image: {{podvertical_pod_image}}
               basename: pausepods
               file: pod-pause.json
       tuningsets:

@@ -34,6 +34,9 @@ scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', 
 
 # NodeVertical workload specific parameters:
 nodevertical_test_prefix: "{{ lookup('env', 'NODEVERTICAL_TEST_PREFIX')|default('nodevertical', true) }}"
+nodevertical_cleanup: "{{ lookup('env', 'NODEVERTICAL_CLEANUP')|default(true, true)|bool|lower }}"
+nodevertical_basename: "{{ lookup('env', 'NODEVERTICAL_BASENAME')|default('nodevertical', true) }}"
 nodevertical_maxpods: "{{ lookup('env', 'NODEVERTICAL_MAXPODS')|default(1000, true)|int }}"
+nodevertical_pod_image: "{{ lookup('env', 'NODEVERTICAL_POD_IMAGE')|default('gcr.io/google_containers/pause-amd64:3.0', true) }}"
 nodevertical_stepsize: "{{ lookup('env', 'NODEVERTICAL_STEPSIZE')|default(50, true)|int }}"
 nodevertical_pause: "{{ lookup('env', 'NODEVERTICAL_PAUSE')|default(60, true)|int }}"

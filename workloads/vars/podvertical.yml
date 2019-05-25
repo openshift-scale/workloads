@@ -34,6 +34,9 @@ scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', 
 
 # PodVertical workload specific parameters:
 podvertical_test_prefix: "{{ lookup('env', 'PODVERTICAL_TEST_PREFIX')|default('podvertical', true) }}"
+podvertical_cleanup: "{{ lookup('env', 'PODVERTICAL_CLEANUP')|default(true, true)|bool|lower }}"
+podvertical_basename: "{{ lookup('env', 'PODVERTICAL_BASENAME')|default('podvertical', true) }}"
 podvertical_maxpods: "{{ lookup('env', 'PODVERTICAL_MAXPODS')|default(1000, true)|int }}"
+podvertical_pod_image: "{{ lookup('env', 'PODVERTICAL_POD_IMAGE')|default('gcr.io/google_containers/pause-amd64:3.0', true) }}"
 podvertical_stepsize: "{{ lookup('env', 'PODVERTICAL_STEPSIZE')|default(500, true)|int }}"
 podvertical_pause: "{{ lookup('env', 'PODVERTICAL_PAUSE')|default(30, true)|int }}"
