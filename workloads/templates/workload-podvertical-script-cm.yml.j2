@@ -43,7 +43,6 @@ data:
 
     # Start of Test Code
     echo "$(date -u) Running Pod Vertical"
-    export KUBECONFIG=/root/.kube/config
     cd /tmp/tests
     pbench-user-benchmark -- 'VIPERCONFIG=clc/podvertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{podvertical_test_prefix}}

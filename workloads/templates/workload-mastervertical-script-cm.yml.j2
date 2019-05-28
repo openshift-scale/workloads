@@ -50,7 +50,6 @@ data:
 
     # Start of Test Code
     echo "$(date -u) Running Master Vertical"
-    export KUBECONFIG=/root/.kube/config
     cd /tmp/tests
     pbench-user-benchmark -- 'VIPERCONFIG=clc/mastervertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{mastervertical_test_prefix}}
@@ -65,13 +64,13 @@ data:
           basename: {{mastervertical_basename}}
           ifexists: delete
           templates:
-            # - num: 3
-            #   file: ./build-config-template.json
-            # - num: 3
-            #   file: ./bc-imagestream-template.json
-            - num: 1
+            - num: 3
+              file: ./build-config-template.json
+            - num: 3
+              file: ./bc-imagestream-template.json
+            - num: 6
               file: ./build-template.json
-            - num: 1
+            - num: 6
               file: ./build-imagestream-template.json
             - num: 2
               file: ./deployment-config-1rep-pause-template.json
@@ -211,7 +210,7 @@ data:
         "name": "buildTemplate",
         "creationTimestamp": null,
         "annotations": {
-          "description": "This template will create a single (failed) build.",
+          "description": "This template will create a single build.",
           "tags": ""
         }
       },
@@ -220,20 +219,7 @@ data:
             "apiVersion": "v1",
             "kind": "Build",
             "metadata": {
-                "annotations": {
-                    "openshift.io/build.number": "1",
-                    "openshift.io/build.pod-name": "buildconfig${IDENTIFIER}-1-build"
-                },
-                "labels": {
-                    "buildconfig": "buildconfig${IDENTIFIER}",
-                    "openshift.io/build-config.name": "buildconfig${IDENTIFIER}",
-                    "template": "buildConfigTemplate"
-                },
-                "name": "build${IDENTIFIER}-1",
-                "namespace": "default",
-                "resourceVersion": "2361",
-                "selfLink": "/oapi/v1/namespaces/default/builds/build${IDENTIFIER}-1",
-                "uid": "31c35a87-c93f-11e5-8bc3-0e16b72da8bb"
+                "name": "build${IDENTIFIER}-1"
             },
             "spec": {
                 "output": {
@@ -304,12 +290,6 @@ data:
           "description": "Number to append to the name of resources",
           "value": "1",
           "required": true
-        },
-        {
-          "name": "IMAGE",
-          "description": "Image to use for this image stream",
-          "value": "quay.io/openshift-scale/mastervertical-build",
-          "required": false
         }
       ],
       "labels": {
@@ -357,7 +337,7 @@ data:
                       {
                         "name": "ENVVAR1_${IDENTIFIER}",
                         "value": "${ENV_VALUE}"
-                      },
+                      }, 
                       {
                         "name": "ENVVAR2_${IDENTIFIER}",
                         "value": "${ENV_VALUE}"
