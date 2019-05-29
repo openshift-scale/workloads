@@ -62,12 +62,27 @@ spec:
         - name: proc-mount
           mountPath: /proc_host
 {% endif %}
+        env:
+        - name: OCP_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: OCP_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+{% if enable_pbench_agents %}
+        - name: ENABLE_PBENCH_AGENTS
+          value: "true"
+{% endif %}
 {% if enable_pbench_agents %}
         ports:
         - containerPort: 2022
-        env:
-        - name: ENABLE_PBENCH_AGENTS
-          value: "true"
+{% endif %}
+{% if workload_job == "http" %}
+        envFrom:
+        - configMapRef:
+            name: scale-ci-workload-http-env
 {% endif %}
       volumes:
       - name: workload-script

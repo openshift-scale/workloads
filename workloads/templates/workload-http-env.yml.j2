@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-http-env
+data:
+{% for v in http_env_vars %}
+  {{ v }}: "{{ lookup('env', v) }}"
+{% endfor %}
