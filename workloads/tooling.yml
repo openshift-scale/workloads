@@ -69,10 +69,20 @@
       changed_when: false
       register: scale_ci_tooling_ns_exists
 
-    # Known issue with waiting for delete - https://bugzilla.redhat.com/show_bug.cgi?id=1704284
     - name: Delete scale-ci-tooling namespace
       shell: |
         oc delete project --wait scale-ci-tooling
+      when:
+        - scale_ci_tooling_ns_exists.rc == 0
+
+    - name: Wait until scale-ci-tooling project is deleted
+      shell: |
+         oc project scale-ci-tooling
+      register: scale_ci_tooling_project
+      failed_when: scale_ci_tooling_project.rc == 0
+      until: scale_ci_tooling_project.rc == 1
+      retries: 60
+      delay: 2
       when:
         - scale_ci_tooling_ns_exists.rc == 0
 
@@ -125,4 +135,14 @@
         oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-master-ds.yml"
         oc create -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-worker-ds.yml"
 
-    # Need wait for daemonsets to be ready
+    - name: Wait until pbench-agent daemonsets are ready
+      shell: |
+         oc get ds {{item}} -n scale-ci-tooling -o json
+      with_items:
+        - pbench-agent-master
+        - pbench-agent-infra
+        - pbench-agent-worker
+      register: pbench_agent_ds
+      retries: 60
+      delay: 2
+      until: pbench_agent_ds.stdout | from_json | json_query('status.currentNumberScheduled==status.numberReady')
