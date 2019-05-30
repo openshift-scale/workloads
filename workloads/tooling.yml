@@ -72,12 +72,11 @@
     - name: Delete scale-ci-tooling namespace
       shell: |
         oc delete project --wait scale-ci-tooling
-      when:
-        - scale_ci_tooling_ns_exists.rc == 0
+      when: scale_ci_tooling_ns_exists.rc == 0
 
     - name: Wait until scale-ci-tooling project is deleted
       shell: |
-         oc project scale-ci-tooling
+        oc project scale-ci-tooling
       register: scale_ci_tooling_project
       failed_when: scale_ci_tooling_project.rc == 0
       until: scale_ci_tooling_project.rc == 1
@@ -137,7 +136,7 @@
 
     - name: Wait until pbench-agent daemonsets are ready
       shell: |
-         oc get ds {{item}} -n scale-ci-tooling -o json
+        oc get ds {{item}} -n scale-ci-tooling -o json
       with_items:
         - pbench-agent-master
         - pbench-agent-infra

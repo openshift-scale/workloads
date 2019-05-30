@@ -67,15 +67,15 @@
       changed_when: false
       register: scale_ci_tooling_ns_exists
 
-    # This delete should block until complete
-    - name: Block for existing tooling namespace
-      block:
-        - name: Ensure any stale scale-ci-workload job is deleted
-          shell: |
-            oc delete job scale-ci-workload -n scale-ci-tooling
-          ignore_errors: true
-      when:
-        - scale_ci_tooling_ns_exists.rc == 0
+    - name: Ensure any stale scale-ci-test job is deleted
+      shell: |
+        oc delete job scale-ci-test -n scale-ci-tooling
+      register: scale_ci_tooling_project
+      failed_when: scale_ci_tooling_project.rc == 0
+      until: scale_ci_tooling_project.rc == 1
+      retries: 60
+      delay: 1
+      when: scale_ci_tooling_ns_exists.rc == 0
 
     - name: Block for non-existing tooling namespace
       block:
@@ -87,8 +87,7 @@
           shell: |
             oc create serviceaccount useroot -n scale-ci-tooling
             oc adm policy add-scc-to-user privileged -z useroot -n scale-ci-tooling
-      when:
-        - scale_ci_tooling_ns_exists.rc != 0
+      when: scale_ci_tooling_ns_exists.rc != 0
 
     - name: Create/replace kubeconfig secret
       shell: |

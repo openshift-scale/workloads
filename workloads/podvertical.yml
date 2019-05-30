@@ -63,15 +63,15 @@
       changed_when: false
       register: scale_ci_tooling_ns_exists
 
-    # This delete should block until complete
-    - name: Block for existing tooling namespace
-      block:
-        - name: Ensure any stale scale-ci-workload job is deleted
-          shell: |
-            oc delete job scale-ci-workload -n scale-ci-tooling
-          ignore_errors: true
-      when:
-        - scale_ci_tooling_ns_exists.rc == 0
+    - name: Ensure any stale scale-ci-podvertical job is deleted
+      shell: |
+        oc delete job scale-ci-podvertical -n scale-ci-tooling
+      register: scale_ci_tooling_project
+      failed_when: scale_ci_tooling_project.rc == 0
+      until: scale_ci_tooling_project.rc == 1
+      retries: 60
+      delay: 1
+      when: scale_ci_tooling_ns_exists.rc == 0
 
     - name: Block for non-existing tooling namespace
       block:
@@ -83,11 +83,9 @@
           shell: |
             oc create serviceaccount useroot -n scale-ci-tooling
             oc adm policy add-scc-to-user privileged -z useroot -n scale-ci-tooling
-          when: enable_pbench_agents
-      when:
-        - scale_ci_tooling_ns_exists.rc != 0
+          when: enable_pbench_agents|bool
+      when: scale_ci_tooling_ns_exists.rc != 0
 
-    # Create Secrets for workload job
     - name: Create/replace kubeconfig secret
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
@@ -108,8 +106,20 @@
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
 
-    # Might need retires to account for api server cert rotation / connection breaking
-    # Wait for job start, then wait for complete
-    # - name: Wait for job to complete
-    #   shell: |
-    #     oc logs -f job/scale-ci-podvertical -n scale-ci-tooling
+    - name: Poll until job is active
+      shell: |
+        oc get job scale-ci-podvertical -n scale-ci-tooling -o json
+      register: job_json
+      retries: 60
+      delay: 2
+      until: job_json.stdout | from_json | json_query('status.active==`1`')
+
+    - name: Poll until job is complete
+      shell: |
+        oc get job scale-ci-podvertical -n scale-ci-tooling -o json
+      register: job_json
+      retries: "{{job_completion_poll_attempts}}"
+      delay: 10
+      until: job_json.stdout | from_json | json_query('status.succeeded==`1` || status.failed==`1`')
+      failed_when: job_json.stdout | from_json | json_query('status.succeeded==`1`') == false
+      when: job_completion_poll_attempts|int > 0
