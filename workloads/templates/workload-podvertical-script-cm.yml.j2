@@ -52,8 +52,8 @@ data:
           pods:
             - num: {{podvertical_maxpods}}
               image: {{podvertical_pod_image}}
-              basename: pausepods
-              file: pod-pause.yaml
+              basename: podvert
+              file: podvert-pod.yaml
       tuningsets:
         - name: default
           pods:
@@ -62,28 +62,21 @@ data:
               pause: {{podvertical_pause}}
             ratelimit:
               delay: 0
-  pod-pause.yaml: |
+  podvert-pod.yaml: |
     ---
     kind: Pod
     apiVersion: v1
     metadata:
-      name: pause-amd64
-      creationTimestamp:
+      name: podvert
       labels:
-        name: pause-amd64
+        name: podvert
     spec:
       containers:
-      - name: pause-amd64
-        image: gcr.io/google_containers/pause-amd64:3.0
+      - name: podvert
+        image: {{podvertical_pod_image}}
         ports:
         - containerPort: 8080
           protocol: TCP
-        terminationMessagePath: "/dev/termination-log"
         imagePullPolicy: IfNotPresent
-        capabilities: {}
         securityContext:
-          capabilities: {}
           privileged: false
-      restartPolicy: Always
-      dnsPolicy: ClusterFirst
-      serviceAccount: ''

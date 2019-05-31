@@ -52,8 +52,8 @@ data:
           pods:
             - num: {{total_pod_count.stdout|int}}
               image: {{nodevertical_pod_image}}
-              basename: pausepods
-              file: pod-pause-labeled-nodes.yaml
+              basename: nodevert
+              file: nodevert-pod-labeled.yaml
       tuningsets:
         - name: default
           pods:
@@ -62,30 +62,23 @@ data:
               pause: {{nodevertical_pause}}
             ratelimit:
               delay: 0
-  pod-pause-labeled-nodes.yaml: |
+  nodevert-pod-labeled.yaml: |
     ---
     kind: Pod
     apiVersion: v1
     metadata:
-      name: pause-amd64
-      creationTimestamp:
+      name: nodevert
       labels:
-        name: pause-amd64
+        name: nodevert
     spec:
       containers:
-      - name: pause-amd64
-        image: gcr.io/google_containers/pause-amd64:3.0
+      - name: nodevert
+        image: {{nodevertical_pod_image}}
         ports:
         - containerPort: 8080
           protocol: TCP
-        terminationMessagePath: "/dev/termination-log"
         imagePullPolicy: IfNotPresent
-        capabilities: {}
         securityContext:
-          capabilities: {}
           privileged: false
-      restartPolicy: Always
-      dnsPolicy: ClusterFirst
-      serviceAccount: ''
       nodeSelector:
         nodevertical: 'true'
