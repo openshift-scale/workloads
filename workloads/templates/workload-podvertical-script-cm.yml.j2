@@ -6,6 +6,7 @@ data:
   run.sh: |
     #!/bin/sh
     # pbench Configuration
+    echo "$(date -u) Configuring pbench for Pod Vertical"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     echo "" > /var/lib/pbench-agent/tools-default/oc
@@ -30,21 +31,12 @@ data:
       done
     fi
     source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for Pod Vertical"
     # End pbench Configuration
-
-    # Test Configuration
-    echo "$(date -u) Configuring Pod Vertical"
-    mkdir -p /tmp/tests/clc
-    mkdir -p /tmp/tests/content
-    cp /root/workload/podvertical.yaml /tmp/tests/clc/podvertical.yaml
-    cp /root/workload/pod-pause.json /tmp/tests/content/pod-pause.json
-    echo "$(date -u) Done Configuring Pod Vertical"
-    # End Test Configuration
 
     # Start of Test Code
     echo "$(date -u) Running Pod Vertical"
-    cd /tmp/tests
-    pbench-user-benchmark -- 'VIPERCONFIG=clc/podvertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/podvertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{podvertical_test_prefix}}
     echo "$(date -u) Completed Pod Vertical"
     # End of Test Code
@@ -61,7 +53,7 @@ data:
             - num: {{podvertical_maxpods}}
               image: {{podvertical_pod_image}}
               basename: pausepods
-              file: pod-pause.json
+              file: pod-pause.yaml
       tuningsets:
         - name: default
           pods:
@@ -70,40 +62,28 @@ data:
               pause: {{podvertical_pause}}
             ratelimit:
               delay: 0
-  pod-pause.json: |
-    {
-      "kind": "Pod",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "pause-amd64",
-        "creationTimestamp": null,
-        "labels": {
-          "name": "pause-amd64"
-        }
-      },
-      "spec": {
-        "containers": [
-          {
-            "name": "pause-amd64",
-            "image": "gcr.io/google_containers/pause-amd64:3.0",
-            "ports": [
-              {
-                "containerPort": 8080,
-                "protocol": "TCP"
-              }
-            ],
-            "terminationMessagePath": "/dev/termination-log",
-            "imagePullPolicy": "IfNotPresent",
-            "capabilities": {},
-            "securityContext": {
-              "capabilities": {},
-              "privileged": false
-            }
-          }
-        ],
-        "restartPolicy": "Always",
-        "dnsPolicy": "ClusterFirst",
-        "serviceAccount": ""
-      },
-      "status": {}
-    }
+  pod-pause.yaml: |
+    ---
+    kind: Pod
+    apiVersion: v1
+    metadata:
+      name: pause-amd64
+      creationTimestamp:
+      labels:
+        name: pause-amd64
+    spec:
+      containers:
+      - name: pause-amd64
+        image: gcr.io/google_containers/pause-amd64:3.0
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        terminationMessagePath: "/dev/termination-log"
+        imagePullPolicy: IfNotPresent
+        capabilities: {}
+        securityContext:
+          capabilities: {}
+          privileged: false
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      serviceAccount: ''

@@ -6,6 +6,7 @@ data:
   run.sh: |
     #!/bin/sh
     # pbench Configuration
+    echo "$(date -u) Configuring pbench for Master Vertical"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     echo "" > /var/lib/pbench-agent/tools-default/oc
@@ -30,28 +31,12 @@ data:
       done
     fi
     source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for Master Vertical"
     # End pbench Configuration
-
-    # Test Configuration
-    echo "$(date -u) Configuring Master Vertical"
-    mkdir -p /tmp/tests/clc
-    mkdir -p /tmp/tests/content
-    cp /root/workload/mastervertical.yaml /tmp/tests/clc/mastervertical.yaml
-    cp /root/workload/build-config-template.json /tmp/tests/content/build-config-template.json
-    cp /root/workload/bc-imagestream-template.json /tmp/tests/content/bc-imagestream-template.json
-    cp /root/workload/build-template.json /tmp/tests/content/build-template.json
-    cp /root/workload/build-imagestream-template.json /tmp/tests/content/build-imagestream-template.json
-    cp /root/workload/deployment-config-1rep-pause-template.json /tmp/tests/content/deployment-config-1rep-pause-template.json
-    cp /root/workload/deployment-config-2rep-pause-template.json /tmp/tests/content/deployment-config-2rep-pause-template.json
-    cp /root/workload/ssh-secret-template.json /tmp/tests/content/ssh-secret-template.json
-    cp /root/workload/route-template.json /tmp/tests/content/route-template.json
-    echo "$(date -u) Done Configuring Master Vertical"
-    # End Test Configuration
 
     # Start of Test Code
     echo "$(date -u) Running Master Vertical"
-    cd /tmp/tests
-    pbench-user-benchmark -- 'VIPERCONFIG=clc/mastervertical openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/mastervertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{mastervertical_test_prefix}}
     echo "$(date -u) Completed Master Vertical"
     # End of Test Code
@@ -65,578 +50,449 @@ data:
           ifexists: delete
           templates:
             - num: 3
-              file: ./build-config-template.json
+              file: build-config-template.yaml
             - num: 3
-              file: ./bc-imagestream-template.json
+              file: bc-imagestream-template.yaml
             - num: 6
-              file: ./build-template.json
+              file: build-template.yaml
             - num: 6
-              file: ./build-imagestream-template.json
+              file: build-imagestream-template.yaml
             - num: 2
-              file: ./deployment-config-1rep-pause-template.json
+              file: deployment-config-1rep-pause-template.yaml
               parameters:
                 - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
             - num: 1
-              file: ./deployment-config-2rep-pause-template.json
+              file: deployment-config-2rep-pause-template.yaml
               parameters:
                 - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
             - num: 20
-              file: ./ssh-secret-template.json
+              file: ssh-secret-template.yaml
             - num: 3
-              file: ./route-template.json
-  build-config-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "buildConfigTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a single buildConfig.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-          "kind": "BuildConfig",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "buildconfig${IDENTIFIER}"
-          },
-          "spec": {
-            "triggers": [
-              {
-                "type": "GitHub",
-                "github": {
-                  "secret": "hello-openshift-secret${IDENTIFIER}"
-                }
-              },
-              {
-                "type": "ImageChange"
-              }
-            ],
-            "source": {
-              "type": "Git",
-              "git": {
-                "uri": "https://github.com/openshift-scale/hello-openshift.git"
-              },
-              "dockerfile": "FROM quay.io/openshift-scale/mastervertical-build\nUSER 1001"
-            },
-            "strategy": {
-              "type": "Source",
-              "sourceStrategy": {
-                "from": {
-                  "kind": "ImageStreamTag",
-                  "name": "bc-imagestream-src${IDENTIFIER}:latest"
-                }
-              }
-            },
-            "output": {
-              "to": {
-                "kind": "ImageStreamTag",
-                "name": "bc-imagestream-dest${IDENTIFIER}:latest"
-              }
-            }
-          }
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        }
-      ],
-      "labels": {
-        "template": "buildConfigTemplate"
-      }
-    }
-  bc-imagestream-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "imagestreamTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create two imageStreams.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-          "apiVersion": "v1",
-          "kind": "ImageStream",
-          "metadata": {
-            "name": "bc-imagestream-src${IDENTIFIER}"
-          },
-          "spec": {
-            "dockerImageRepository": "${IMAGE}"
-          }
-        },
-        {
-          "apiVersion": "v1",
-          "kind": "ImageStream",
-          "metadata": {
-            "name": "bc-imagestream-dest${IDENTIFIER}"
-          },
-          "spec": {}
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        },
-        {
-          "name": "IMAGE",
-          "description": "Image to use for this image stream",
-          "value": "quay.io/openshift-scale/mastervertical-build",
-          "required": false
-        }
-      ],
-      "labels": {
-        "template": "imagestreamTemplate"
-      }
-    }
-  build-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "buildTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a single build.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-            "apiVersion": "v1",
-            "kind": "Build",
-            "metadata": {
-                "name": "build${IDENTIFIER}-1"
-            },
-            "spec": {
-                "output": {
-                    "to": {
-                        "kind": "ImageStreamTag",
-                        "name": "build-imagestream-dest${IDENTIFIER}:latest"
-                    }
-                },
-                "resources": {},
-                "serviceAccount": "builder",
-                "source": {
-                    "dockerfile": "FROM quay.io/openshift-scale/mastervertical-build\nUSER example",
-                    "git": {
-                        "uri": "https://github.com/openshift-scale/hello-openshift.git"
-                    },
-                    "secrets": null,
-                    "type": "Git"
-                },
-                "strategy": {
-                    "sourceStrategy": {
-                        "from": {
-                            "kind": "DockerImage",
-                            "name": "quay.io/openshift-scale/mastervertical-build:latest"
-                        }
-                    },
-                    "type": "Source"
-                }
-            }
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        }
-      ],
-      "labels": {
-        "template": "buildTemplate"
-      }
-    }
-  build-imagestream-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "imagestreamTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a single imageStream.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-          "apiVersion": "v1",
-          "kind": "ImageStream",
-          "metadata": {
-            "name": "build-imagestream-dest${IDENTIFIER}"
-          },
-          "spec": {}
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        }
-      ],
-      "labels": {
-        "template": "imagestreamTemplate"
-      }
-    }
-  deployment-config-1rep-pause-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "deploymentConfigTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a deploymentConfig with 1 replica, 4 env vars, and a service.",
-          "tags": ""
-        }
-      },
-      "objects": [
-          {
-          "kind": "DeploymentConfig",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "deploymentconfig${IDENTIFIER}"
-          },
-          "spec": {
-            "template": {
-              "metadata": {
-                "labels": {
-                  "name": "replicationcontroller${IDENTIFIER}"
-                }
-              },
-              "spec": {
-                "containers": [
-                  {
-                    "name": "pause${IDENTIFIER}",
-                    "image": "${IMAGE}",
-                    "ports": [
-                      {
-                        "containerPort": 8080,
-                        "protocol": "TCP"
-                      }
-                    ],
-                    "env": [
-                      {
-                        "name": "ENVVAR1_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      }, 
-                      {
-                        "name": "ENVVAR2_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      },
-                      {
-                        "name": "ENVVAR3_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      },
-                      {
-                        "name": "ENVVAR4_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      }
-                    ],
-                    "resources": {},
-                    "imagePullPolicy": "IfNotPresent",
-                    "capabilities": {},
-                    "securityContext": {
-                      "capabilities": {},
-                      "privileged": false
-                    }
-                  }
-                ],
-                "restartPolicy": "Always",
-                "serviceAccount": ""
-              }
-            },
-            "replicas": 1,
-            "selector": {
-              "name": "replicationcontroller${IDENTIFIER}"
-            },
-            "triggers": [
-              {
-                "type": "ConfigChange"
-              }
-            ],
-            "strategy": {
-              "type": "Rolling"
-            }
-          }
-        },
-        {
-          "kind": "Service",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "service${IDENTIFIER}"
-          },
-          "spec": {
-            "selector": {
-              "name": "replicationcontroller${IDENTIFIER}"
-            },
-            "ports": [
-              {
-                "name": "serviceport${IDENTIFIER}",
-                "protocol": "TCP",
-                "port": 80,
-                "targetPort": 8080
-              }
-            ],
-            "portalIP": "",
-            "type": "ClusterIP",
-            "sessionAffinity": "None"
-          },
-          "status": {
-            "loadBalancer": {}
-          }
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        },
-        {
-          "name": "IMAGE",
-          "description": "Image to use for deploymentConfig",
-          "value": "gcr.io/google-containers/pause-amd64:3.0",
-          "required": false
-        },
-        {
-          "name": "ENV_VALUE",
-          "description": "Value to use for environment variables",
-          "generate": "expression",
-          "from": "[A-Za-z0-9]{255}",
-          "required": false
-        }
-      ],
-      "labels": {
-        "template": "deploymentConfigTemplate"
-      }
-    }
-  deployment-config-2rep-pause-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "deploymentConfigTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a deploymentConfig with 2 replicas, two envs, and a service.",
-          "tags": ""
-        }
-      },
-      "objects": [
-          {
-          "kind": "DeploymentConfig",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "deploymentconfig2v${IDENTIFIER}"
-          },
-          "spec": {
-            "template": {
-              "metadata": {
-                "labels": {
-                  "name": "replicationcontroller2v${IDENTIFIER}"
-                }
-              },
-              "spec": {
-                "containers": [
-                  {
-                    "name": "pause2v${IDENTIFIER}",
-                    "image": "${IMAGE}",
-                    "ports": [
-                      {
-                        "containerPort": 8080,
-                        "protocol": "TCP"
-                      }
-                    ],
-                    "env": [
-                      {
-                        "name": "ENVVAR1_2v_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      },
-                      {
-                        "name": "ENVVAR2_2v_${IDENTIFIER}",
-                        "value": "${ENV_VALUE}"
-                      }
-                    ],
-                    "resources": {},
-                    "imagePullPolicy": "IfNotPresent",
-                    "capabilities": {},
-                    "securityContext": {
-                      "capabilities": {},
-                      "privileged": false
-                    }
-                  }
-                ],
-                "restartPolicy": "Always",
-                "serviceAccount": ""
-              }
-            },
-            "replicas": 2,
-            "selector": {
-              "name": "replicationcontroller2v${IDENTIFIER}"
-            },
-            "triggers": [
-              {
-                "type": "ConfigChange"
-              }
-            ],
-            "strategy": {
-              "type": "Rolling"
-            }
-          }
-        },
-        {
-          "kind": "Service",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "service2v${IDENTIFIER}"
-          },
-          "spec": {
-            "selector": {
-              "name": "replicationcontroller2v${IDENTIFIER}"
-            },
-            "ports": [
-              {
-                "name": "serviceport2v${IDENTIFIER}",
-                "protocol": "TCP",
-                "port": 80,
-                "targetPort": 8080
-              }
-            ],
-            "portalIP": "",
-            "type": "ClusterIP",
-            "sessionAffinity": "None"
-          },
-          "status": {
-            "loadBalancer": {}
-          }
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        },
-        {
-          "name": "IMAGE",
-          "description": "Image to use for deploymentConfig",
-          "value": "gcr.io/google-containers/pause-amd64:3.0",
-          "required": false
-        },
-        {
-          "name": "ENV_VALUE",
-          "description": "Value to use for environment variables",
-          "generate": "expression",
-          "from": "[A-Za-z0-9]{255}",
-          "required": false
-        }
-      ],
-      "labels": {
-        "template": "deploymentConfigTemplate"
-      }
-    }
-  ssh-secret-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "sshSecretTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a single secret.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-            "apiVersion": "v1",
-            "kind": "Secret",
-            "metadata": {
-                "name": "sshsecret${IDENTIFIER}"
-            },
-            "data": {
-                "ssh-privatekey": "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdWJOek5CaUl0aXJRemtRa3kydU05aVdvRFp0UEhkS3hPeW1YNXFPOVE3UG4wVnJQCjlQelB0VlErUHNkRXhTZzFvaXlWMjU2M3diWVdjVW10NGNXVnlmMWtPUTl3YVRBUnRUTTBOTkorTWhTeExLUkYKL2VqQjRETmxEWHdHcW9xck5EaE5qNENqQTZtNWVoWmV6ZTF2RlAvaFJkaXdjbUtOa0tiSzNBbTRYN0gxNjMybQpZUUl1Vlc4aHZnMlRaS3NiUXdGdUFrRmR0b2VqazZMUmVuMWhLVDdZcEFLaCs4bWNabHphUEtNbjlKRG4vdXJ5CnNPeVdZSDBnenNEL1g2NGJnOWd2b2JMWlBFL2pwN1ZqNFJRTHV3U3NudjFYWFV6WkM1RTlqTjRxbE5oZzk3Z0wKTFJyRzVBRUhZZ3pibTh6d2VkMEpFMXhBTFFhbXBOUnl5T1ZlMXdJREFRQUJBb0lCQUM3Umdtc1JBRzdGTHEzQwpXbkI2NWlnczZFaTk3bDE3Z0RtRlRBblhJR0dRV3hMYVRYSGJ4MVpWTGZoUDd4T3lCb3VqcUFpZDVJQlBNeXRPCnd5c1gwS01EWXFCTU56QWQ4V2o0eHVIR2JCQ2VUT2tQWmFJVmE4UGwwVVZzRHBZeXJlVlZpS0IwY3lUNlJvdjAKVmVTZlJ4RkpUZmQ1SVV0RmM2R1RtN09NTTlMVU1sWEh4NFhiREN2MDhOdlFSdk9NbUtHTGFsSmJEMndxcTZVWgpEMjJsc1MyanFrQU1MZS9UMm42YXVDYXQzaHB1VHYvYVArRFRhS3RwZGt3UlJ6RzlrQ0FSbjNIempQM0FEYVBWCkVBaXZFWFlSVW45MkZ4TlhlZ0xtL2R1WnZ2dFI0dzN3NDVBL2tVWUhnQXE1a2o4bHkwSWhCOVNMZDVFZmprVmUKWXNkNUJWa0NnWUVBMnFoVXdPNkk0cUZNU3VvSUszN3d1a01ZYTV2M2ErV2ZuUXN1ZGYxWSswYVNTeFlDT0dseAowenFuNUdRakVuZVhiVkViNDlUVlhyTStvdWRoTzZJZTQvWmxKNmxFS2tvbnB1QlMzYi93c3NOZFd5VEZJZkp0CkxBby9pM09FQlB3OTQvczFuNm1saXVodnI1WnpFSzBjend4NFBZaUFEOTVRaWIyVlAxTjFBdFVDZ1lFQTJXcEQKZ203Nm1zQnZyTENGOWFLV0EwTHZRVjV4ZE9OVHBZd0Z5WWRSei9MOXZhcW9kS280dzBLMkpFSWFwcWg5VXB3dwpWS3dxS0k3TUY0ZVplVnNLS1JKZldLcmZKdWhwT2hHNlFDSXNzQm5kNExmN3RxaHp1Z3Q3bkFicnd3SjFIS3BrCi9Xb0g3MGZFdjl5dVBxQ0pzMFR6ZWRJTVl5M2M5dkg5UGg3Wk9Qc0NnWUI2OElvMnIrZG5CU25RTlNYQ3p1eXEKelc2OWtrUGE5cEIzekFHamRYN0NTVHVYM0JnRGY4WHY3ZHJZSHpWWS9NUzNRaE5jVmg1aDBJWTNNY0VKdG0ySAozdEdoS3hxWWJIays2b0d0REc1WkZGODVEOE9IQXJjL084UGV0R1JXS1R6aklpdFVTaDQ1cTlhZjh3ZGZLUFk1CnM5a25QOGhCSTg1RW84TjJoNFlTd1FLQmdRQzRvQ0dHRVFJbENnZUxhVGZJMlBGMUFaRTFQS015TkoxaXRwNXYKZmNjK3hNVXZIRTREREU0NW1sd2NQRHB2amlNbVZOWkNBUlduN1dOcEU5Q0Rtb2p0U2RuSDdRcWsrclhwQndiWAowVzJMZWR2T0tjN0tWUkE1UytrREhXbDE1NDlWOFdqalBmaFEvT3dhVmFkdUxWdmg3VXFwQjNOWGdhbmoxcWxMCjZGeGtvd0tCZ1FDQUkreWtKSmpyWXAyYmhMZVZGSzRUNWcxY3l2Q2dRL0FSVE1WWEtNWGNhbEhTVlJlZysvMEoKSHJYcGZ5MXJ1S3ZTYko1OG5XeDVmRVcwWHpiVFVhY3VjWStYaHVSY2pVN1ptb0w4T2RIZzBodW0yTVlxZytaSwpXZXQ0UkNDdmM5eVVwZzBybUFQZUtvc2w4WUVOcHRwWUJYWHpudzdaNE1KNVcyKy9xbTUvVUE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tGTo="
-            },
-            "type": "Opaque"
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        }
-      ],
-      "labels": {
-        "template": "sshSecretTemplate"
-      }
-    }
-  route-template.json: |
-    {
-      "Kind": "Template",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "routeTemplate",
-        "creationTimestamp": null,
-        "annotations": {
-          "description": "This template will create a single route.",
-          "tags": ""
-        }
-      },
-      "objects": [
-        {
-          "kind": "Route",
-          "apiVersion": "v1",
-          "metadata": {
-            "name": "route${IDENTIFIER}"
-          },
-          "spec": {
-            "host": "www.example${IDENTIFIER}.com",
-            "to": {
-              "kind": "Service",
-              "name": "service${IDENTIFIER}"
-            },
-            "tls": {
-              "termination": "edge",
-              "certificate": "-----BEGIN CERTIFICATE-----\nMIIDIjCCAgqgAwIBAgIBATANBgkqhkiG9w0BAQUFADCBoTELMAkGA1UEBhMCVVMx\nCzAJBgNVBAgMAlNDMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0Rl\nZmF1bHQgQ29tcGFueSBMdGQxEDAOBgNVBAsMB1Rlc3QgQ0ExGjAYBgNVBAMMEXd3\ndy5leGFtcGxlY2EuY29tMSIwIAYJKoZIhvcNAQkBFhNleGFtcGxlQGV4YW1wbGUu\nY29tMB4XDTE1MDExMjE0MTk0MVoXDTE2MDExMjE0MTk0MVowfDEYMBYGA1UEAwwP\nd3d3LmV4YW1wbGUuY29tMQswCQYDVQQIDAJTQzELMAkGA1UEBhMCVVMxIjAgBgkq\nhkiG9w0BCQEWE2V4YW1wbGVAZXhhbXBsZS5jb20xEDAOBgNVBAoMB0V4YW1wbGUx\nEDAOBgNVBAsMB0V4YW1wbGUwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMrv\ngu6ZTTefNN7jjiZbS/xvQjyXjYMN7oVXv76jbX8gjMOmg9m0xoVZZFAE4XyQDuCm\n47VRx5Qrf/YLXmB2VtCFvB0AhXr5zSeWzPwaAPrjA4ebG+LUo24ziS8KqNxrFs1M\nmNrQUgZyQC6XIe1JHXc9t+JlL5UZyZQC1IfaJulDAgMBAAGjDTALMAkGA1UdEwQC\nMAAwDQYJKoZIhvcNAQEFBQADggEBAFCi7ZlkMnESvzlZCvv82Pq6S46AAOTPXdFd\nTMvrh12E1sdVALF1P1oYFJzG1EiZ5ezOx88fEDTW+Lxb9anw5/KJzwtWcfsupf1m\nV7J0D3qKzw5C1wjzYHh9/Pz7B1D0KthQRATQCfNf8s6bbFLaw/dmiIUhHLtIH5Qc\nyfrejTZbOSP77z8NOWir+BWWgIDDB2//3AkDIQvT20vmkZRhkqSdT7et4NmXOX/j\njhPti4b2Fie0LeuvgaOdKjCpQQNrYthZHXeVlOLRhMTSk3qUczenkKTOhvP7IS9q\n+Dzv5hqgSfvMG392KWh5f8xXfJNs4W5KLbZyl901MeReiLrPH3w=\n-----END CERTIFICATE-----",
-              "key": "-----BEGIN PRIVATE KEY-----\nMIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAMrvgu6ZTTefNN7j\njiZbS/xvQjyXjYMN7oVXv76jbX8gjMOmg9m0xoVZZFAE4XyQDuCm47VRx5Qrf/YL\nXmB2VtCFvB0AhXr5zSeWzPwaAPrjA4ebG+LUo24ziS8KqNxrFs1MmNrQUgZyQC6X\nIe1JHXc9t+JlL5UZyZQC1IfaJulDAgMBAAECgYEAnxOjEj/vrLNLMZE1Q9H7PZVF\nWdP/JQVNvQ7tCpZ3ZdjxHwkvf//aQnuxS5yX2Rnf37BS/TZu+TIkK4373CfHomSx\nUTAn2FsLmOJljupgGcoeLx5K5nu7B7rY5L1NHvdpxZ4YjeISrRtEPvRakllENU5y\ngJE8c2eQOx08ZSRE4TkCQQD7dws2/FldqwdjJucYijsJVuUdoTqxP8gWL6bB251q\nelP2/a6W2elqOcWId28560jG9ZS3cuKvnmu/4LG88vZFAkEAzphrH3673oTsHN+d\nuBd5uyrlnGjWjuiMKv2TPITZcWBjB8nJDSvLneHF59MYwejNNEof2tRjgFSdImFH\nmi995wJBAMtPjW6wiqRz0i41VuT9ZgwACJBzOdvzQJfHgSD9qgFb1CU/J/hpSRIM\nkYvrXK9MbvQFvG6x4VuyT1W8mpe1LK0CQAo8VPpffhFdRpF7psXLK/XQ/0VLkG3O\nKburipLyBg/u9ZkaL0Ley5zL5dFBjTV2Qkx367Ic2b0u9AYTCcgi2DsCQQD3zZ7B\nv7BOm7MkylKokY2MduFFXU0Bxg6pfZ7q3rvg8gqhUFbaMStPRYg6myiDiW/JfLhF\nTcFT4touIo7oriFJ\n-----END PRIVATE KEY-----",
-              "caCertificate": "-----BEGIN CERTIFICATE-----\nMIIEFzCCAv+gAwIBAgIJALK1iUpF2VQLMA0GCSqGSIb3DQEBBQUAMIGhMQswCQYD\nVQQGEwJVUzELMAkGA1UECAwCU0MxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoG\nA1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEQMA4GA1UECwwHVGVzdCBDQTEaMBgG\nA1UEAwwRd3d3LmV4YW1wbGVjYS5jb20xIjAgBgkqhkiG9w0BCQEWE2V4YW1wbGVA\nZXhhbXBsZS5jb20wHhcNMTUwMTEyMTQxNTAxWhcNMjUwMTA5MTQxNTAxWjCBoTEL\nMAkGA1UEBhMCVVMxCzAJBgNVBAgMAlNDMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkx\nHDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQxEDAOBgNVBAsMB1Rlc3QgQ0Ex\nGjAYBgNVBAMMEXd3dy5leGFtcGxlY2EuY29tMSIwIAYJKoZIhvcNAQkBFhNleGFt\ncGxlQGV4YW1wbGUuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\nw2rK1J2NMtQj0KDug7g7HRKl5jbf0QMkMKyTU1fBtZ0cCzvsF4CqV11LK4BSVWaK\nrzkaXe99IVJnH8KdOlDl5Dh/+cJ3xdkClSyeUT4zgb6CCBqg78ePp+nN11JKuJlV\nIG1qdJpB1J5O/kCLsGcTf7RS74MtqMFo96446Zvt7YaBhWPz6gDaO/TUzfrNcGLA\nEfHVXkvVWqb3gqXUztZyVex/gtP9FXQ7gxTvJml7UkmT0VAFjtZnCqmFxpLZFZ15\n+qP9O7Q2MpsGUO/4vDAuYrKBeg1ZdPSi8gwqUP2qWsGd9MIWRv3thI2903BczDc7\nr8WaIbm37vYZAS9G56E4+wIDAQABo1AwTjAdBgNVHQ4EFgQUugLrSJshOBk5TSsU\nANs4+SmJUGwwHwYDVR0jBBgwFoAUugLrSJshOBk5TSsUANs4+SmJUGwwDAYDVR0T\nBAUwAwEB/zANBgkqhkiG9w0BAQUFAAOCAQEAaMJ33zAMV4korHo5aPfayV3uHoYZ\n1ChzP3eSsF+FjoscpoNSKs91ZXZF6LquzoNezbfiihK4PYqgwVD2+O0/Ty7UjN4S\nqzFKVR4OS/6lCJ8YncxoFpTntbvjgojf1DEataKFUN196PAANc3yz8cWHF4uvjPv\nWkgFqbIjb+7D1YgglNyovXkRDlRZl0LD1OQ0ZWhd4Ge1qx8mmmanoBeYZ9+DgpFC\nj9tQAbS867yeOryNe7sEOIpXAAqK/DTu0hB6+ySsDfMo4piXCc2aA/eI2DCuw08e\nw17Dz9WnupZjVdwTKzDhFgJZMLDqn37HQnT6EemLFqbcR0VPEnfyhDtZIQ==\n-----END CERTIFICATE-----"
-            }
-          },
-          "status": {}
-        }
-      ],
-      "parameters": [
-        {
-          "name": "IDENTIFIER",
-          "description": "Number to append to the name of resources",
-          "value": "1",
-          "required": true
-        }
-      ],
-      "labels": {
-        "template": "routeTemplate"
-      }
-    }
+              file: route-template.yaml
+  build-config-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: buildConfigTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single buildConfig.
+        tags: ''
+    objects:
+    - kind: BuildConfig
+      apiVersion: v1
+      metadata:
+        name: buildconfig${IDENTIFIER}
+      spec:
+        triggers:
+        - type: GitHub
+          github:
+            secret: hello-openshift-secret${IDENTIFIER}
+        - type: ImageChange
+        source:
+          type: Git
+          git:
+            uri: https://github.com/openshift-scale/hello-openshift.git
+          dockerfile: |-
+            FROM quay.io/openshift-scale/mastervertical-build
+            USER 1001
+        strategy:
+          type: Source
+          sourceStrategy:
+            from:
+              kind: ImageStreamTag
+              name: bc-imagestream-src${IDENTIFIER}:latest
+        output:
+          to:
+            kind: ImageStreamTag
+            name: bc-imagestream-dest${IDENTIFIER}:latest
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    labels:
+      template: buildConfigTemplate
+  bc-imagestream-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: imagestreamTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create two imageStreams.
+        tags: ''
+    objects:
+    - apiVersion: v1
+      kind: ImageStream
+      metadata:
+        name: bc-imagestream-src${IDENTIFIER}
+      spec:
+        dockerImageRepository: "${IMAGE}"
+    - apiVersion: v1
+      kind: ImageStream
+      metadata:
+        name: bc-imagestream-dest${IDENTIFIER}
+      spec: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    - name: IMAGE
+      description: Image to use for this image stream
+      value: quay.io/openshift-scale/mastervertical-build
+      required: false
+    labels:
+      template: imagestreamTemplate
+  build-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: buildTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single build.
+        tags: ''
+    objects:
+    - apiVersion: v1
+      kind: Build
+      metadata:
+        name: build${IDENTIFIER}-1
+      spec:
+        output:
+          to:
+            kind: ImageStreamTag
+            name: build-imagestream-dest${IDENTIFIER}:latest
+        resources: {}
+        serviceAccount: builder
+        source:
+          dockerfile: |-
+            FROM quay.io/openshift-scale/mastervertical-build
+            USER example
+          git:
+            uri: https://github.com/openshift-scale/hello-openshift.git
+          secrets:
+          type: Git
+        strategy:
+          sourceStrategy:
+            from:
+              kind: DockerImage
+              name: quay.io/openshift-scale/mastervertical-build:latest
+          type: Source
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    labels:
+      template: buildTemplate
+  build-imagestream-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: imagestreamTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single imageStream.
+        tags: ''
+    objects:
+    - apiVersion: v1
+      kind: ImageStream
+      metadata:
+        name: build-imagestream-dest${IDENTIFIER}
+      spec: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    labels:
+      template: imagestreamTemplate
+  deployment-config-1rep-pause-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: deploymentConfigTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a deploymentConfig with 1 replica, 4 env
+          vars, and a service.
+        tags: ''
+    objects:
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: deploymentconfig${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: replicationcontroller${IDENTIFIER}
+          spec:
+            containers:
+            - name: pause${IDENTIFIER}
+              image: "${IMAGE}"
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: ENVVAR1_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR2_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR3_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR4_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              resources: {}
+              imagePullPolicy: IfNotPresent
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 1
+        selector:
+          name: replicationcontroller${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    - kind: Service
+      apiVersion: v1
+      metadata:
+        name: service${IDENTIFIER}
+      spec:
+        selector:
+          name: replicationcontroller${IDENTIFIER}
+        ports:
+        - name: serviceport${IDENTIFIER}
+          protocol: TCP
+          port: 80
+          targetPort: 8080
+        portalIP: ''
+        type: ClusterIP
+        sessionAffinity: None
+      status:
+        loadBalancer: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    - name: IMAGE
+      description: Image to use for deploymentConfig
+      value: gcr.io/google-containers/pause-amd64:3.0
+      required: false
+    - name: ENV_VALUE
+      description: Value to use for environment variables
+      generate: expression
+      from: "[A-Za-z0-9]{255}"
+      required: false
+    labels:
+      template: deploymentConfigTemplate
+  deployment-config-2rep-pause-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: deploymentConfigTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a deploymentConfig with 2 replicas, two
+          envs, and a service.
+        tags: ''
+    objects:
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: deploymentconfig2v${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: replicationcontroller2v${IDENTIFIER}
+          spec:
+            containers:
+            - name: pause2v${IDENTIFIER}
+              image: "${IMAGE}"
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: ENVVAR1_2v_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR2_2v_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              resources: {}
+              imagePullPolicy: IfNotPresent
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 2
+        selector:
+          name: replicationcontroller2v${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    - kind: Service
+      apiVersion: v1
+      metadata:
+        name: service2v${IDENTIFIER}
+      spec:
+        selector:
+          name: replicationcontroller2v${IDENTIFIER}
+        ports:
+        - name: serviceport2v${IDENTIFIER}
+          protocol: TCP
+          port: 80
+          targetPort: 8080
+        portalIP: ''
+        type: ClusterIP
+        sessionAffinity: None
+      status:
+        loadBalancer: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    - name: IMAGE
+      description: Image to use for deploymentConfig
+      value: gcr.io/google-containers/pause-amd64:3.0
+      required: false
+    - name: ENV_VALUE
+      description: Value to use for environment variables
+      generate: expression
+      from: "[A-Za-z0-9]{255}"
+      required: false
+    labels:
+      template: deploymentConfigTemplate
+  ssh-secret-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: sshSecretTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single secret.
+        tags: ''
+    objects:
+    - apiVersion: v1
+      kind: Secret
+      metadata:
+        name: sshsecret${IDENTIFIER}
+      data:
+        ssh-privatekey: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdWJOek5CaUl0aXJRemtRa3kydU05aVdvRFp0UEhkS3hPeW1YNXFPOVE3UG4wVnJQCjlQelB0VlErUHNkRXhTZzFvaXlWMjU2M3diWVdjVW10NGNXVnlmMWtPUTl3YVRBUnRUTTBOTkorTWhTeExLUkYKL2VqQjRETmxEWHdHcW9xck5EaE5qNENqQTZtNWVoWmV6ZTF2RlAvaFJkaXdjbUtOa0tiSzNBbTRYN0gxNjMybQpZUUl1Vlc4aHZnMlRaS3NiUXdGdUFrRmR0b2VqazZMUmVuMWhLVDdZcEFLaCs4bWNabHphUEtNbjlKRG4vdXJ5CnNPeVdZSDBnenNEL1g2NGJnOWd2b2JMWlBFL2pwN1ZqNFJRTHV3U3NudjFYWFV6WkM1RTlqTjRxbE5oZzk3Z0wKTFJyRzVBRUhZZ3pibTh6d2VkMEpFMXhBTFFhbXBOUnl5T1ZlMXdJREFRQUJBb0lCQUM3Umdtc1JBRzdGTHEzQwpXbkI2NWlnczZFaTk3bDE3Z0RtRlRBblhJR0dRV3hMYVRYSGJ4MVpWTGZoUDd4T3lCb3VqcUFpZDVJQlBNeXRPCnd5c1gwS01EWXFCTU56QWQ4V2o0eHVIR2JCQ2VUT2tQWmFJVmE4UGwwVVZzRHBZeXJlVlZpS0IwY3lUNlJvdjAKVmVTZlJ4RkpUZmQ1SVV0RmM2R1RtN09NTTlMVU1sWEh4NFhiREN2MDhOdlFSdk9NbUtHTGFsSmJEMndxcTZVWgpEMjJsc1MyanFrQU1MZS9UMm42YXVDYXQzaHB1VHYvYVArRFRhS3RwZGt3UlJ6RzlrQ0FSbjNIempQM0FEYVBWCkVBaXZFWFlSVW45MkZ4TlhlZ0xtL2R1WnZ2dFI0dzN3NDVBL2tVWUhnQXE1a2o4bHkwSWhCOVNMZDVFZmprVmUKWXNkNUJWa0NnWUVBMnFoVXdPNkk0cUZNU3VvSUszN3d1a01ZYTV2M2ErV2ZuUXN1ZGYxWSswYVNTeFlDT0dseAowenFuNUdRakVuZVhiVkViNDlUVlhyTStvdWRoTzZJZTQvWmxKNmxFS2tvbnB1QlMzYi93c3NOZFd5VEZJZkp0CkxBby9pM09FQlB3OTQvczFuNm1saXVodnI1WnpFSzBjend4NFBZaUFEOTVRaWIyVlAxTjFBdFVDZ1lFQTJXcEQKZ203Nm1zQnZyTENGOWFLV0EwTHZRVjV4ZE9OVHBZd0Z5WWRSei9MOXZhcW9kS280dzBLMkpFSWFwcWg5VXB3dwpWS3dxS0k3TUY0ZVplVnNLS1JKZldLcmZKdWhwT2hHNlFDSXNzQm5kNExmN3RxaHp1Z3Q3bkFicnd3SjFIS3BrCi9Xb0g3MGZFdjl5dVBxQ0pzMFR6ZWRJTVl5M2M5dkg5UGg3Wk9Qc0NnWUI2OElvMnIrZG5CU25RTlNYQ3p1eXEKelc2OWtrUGE5cEIzekFHamRYN0NTVHVYM0JnRGY4WHY3ZHJZSHpWWS9NUzNRaE5jVmg1aDBJWTNNY0VKdG0ySAozdEdoS3hxWWJIays2b0d0REc1WkZGODVEOE9IQXJjL084UGV0R1JXS1R6aklpdFVTaDQ1cTlhZjh3ZGZLUFk1CnM5a25QOGhCSTg1RW84TjJoNFlTd1FLQmdRQzRvQ0dHRVFJbENnZUxhVGZJMlBGMUFaRTFQS015TkoxaXRwNXYKZmNjK3hNVXZIRTREREU0NW1sd2NQRHB2amlNbVZOWkNBUlduN1dOcEU5Q0Rtb2p0U2RuSDdRcWsrclhwQndiWAowVzJMZWR2T0tjN0tWUkE1UytrREhXbDE1NDlWOFdqalBmaFEvT3dhVmFkdUxWdmg3VXFwQjNOWGdhbmoxcWxMCjZGeGtvd0tCZ1FDQUkreWtKSmpyWXAyYmhMZVZGSzRUNWcxY3l2Q2dRL0FSVE1WWEtNWGNhbEhTVlJlZysvMEoKSHJYcGZ5MXJ1S3ZTYko1OG5XeDVmRVcwWHpiVFVhY3VjWStYaHVSY2pVN1ptb0w4T2RIZzBodW0yTVlxZytaSwpXZXQ0UkNDdmM5eVVwZzBybUFQZUtvc2w4WUVOcHRwWUJYWHpudzdaNE1KNVcyKy9xbTUvVUE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tGTo=
+      type: Opaque
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    labels:
+      template: sshSecretTemplate
+  route-template.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: routeTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single route.
+        tags: ''
+    objects:
+    - kind: Route
+      apiVersion: v1
+      metadata:
+        name: route${IDENTIFIER}
+      spec:
+        host: www.example${IDENTIFIER}.com
+        to:
+          kind: Service
+          name: service${IDENTIFIER}
+        tls:
+          termination: edge
+          certificate: |-
+            -----BEGIN CERTIFICATE-----
+            MIIDIjCCAgqgAwIBAgIBATANBgkqhkiG9w0BAQUFADCBoTELMAkGA1UEBhMCVVMx
+            CzAJBgNVBAgMAlNDMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0Rl
+            ZmF1bHQgQ29tcGFueSBMdGQxEDAOBgNVBAsMB1Rlc3QgQ0ExGjAYBgNVBAMMEXd3
+            dy5leGFtcGxlY2EuY29tMSIwIAYJKoZIhvcNAQkBFhNleGFtcGxlQGV4YW1wbGUu
+            Y29tMB4XDTE1MDExMjE0MTk0MVoXDTE2MDExMjE0MTk0MVowfDEYMBYGA1UEAwwP
+            d3d3LmV4YW1wbGUuY29tMQswCQYDVQQIDAJTQzELMAkGA1UEBhMCVVMxIjAgBgkq
+            hkiG9w0BCQEWE2V4YW1wbGVAZXhhbXBsZS5jb20xEDAOBgNVBAoMB0V4YW1wbGUx
+            EDAOBgNVBAsMB0V4YW1wbGUwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMrv
+            gu6ZTTefNN7jjiZbS/xvQjyXjYMN7oVXv76jbX8gjMOmg9m0xoVZZFAE4XyQDuCm
+            47VRx5Qrf/YLXmB2VtCFvB0AhXr5zSeWzPwaAPrjA4ebG+LUo24ziS8KqNxrFs1M
+            mNrQUgZyQC6XIe1JHXc9t+JlL5UZyZQC1IfaJulDAgMBAAGjDTALMAkGA1UdEwQC
+            MAAwDQYJKoZIhvcNAQEFBQADggEBAFCi7ZlkMnESvzlZCvv82Pq6S46AAOTPXdFd
+            TMvrh12E1sdVALF1P1oYFJzG1EiZ5ezOx88fEDTW+Lxb9anw5/KJzwtWcfsupf1m
+            V7J0D3qKzw5C1wjzYHh9/Pz7B1D0KthQRATQCfNf8s6bbFLaw/dmiIUhHLtIH5Qc
+            yfrejTZbOSP77z8NOWir+BWWgIDDB2//3AkDIQvT20vmkZRhkqSdT7et4NmXOX/j
+            jhPti4b2Fie0LeuvgaOdKjCpQQNrYthZHXeVlOLRhMTSk3qUczenkKTOhvP7IS9q
+            +Dzv5hqgSfvMG392KWh5f8xXfJNs4W5KLbZyl901MeReiLrPH3w=
+            -----END CERTIFICATE-----
+          key: |-
+            -----BEGIN PRIVATE KEY-----
+            MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAMrvgu6ZTTefNN7j
+            jiZbS/xvQjyXjYMN7oVXv76jbX8gjMOmg9m0xoVZZFAE4XyQDuCm47VRx5Qrf/YL
+            XmB2VtCFvB0AhXr5zSeWzPwaAPrjA4ebG+LUo24ziS8KqNxrFs1MmNrQUgZyQC6X
+            Ie1JHXc9t+JlL5UZyZQC1IfaJulDAgMBAAECgYEAnxOjEj/vrLNLMZE1Q9H7PZVF
+            WdP/JQVNvQ7tCpZ3ZdjxHwkvf//aQnuxS5yX2Rnf37BS/TZu+TIkK4373CfHomSx
+            UTAn2FsLmOJljupgGcoeLx5K5nu7B7rY5L1NHvdpxZ4YjeISrRtEPvRakllENU5y
+            gJE8c2eQOx08ZSRE4TkCQQD7dws2/FldqwdjJucYijsJVuUdoTqxP8gWL6bB251q
+            elP2/a6W2elqOcWId28560jG9ZS3cuKvnmu/4LG88vZFAkEAzphrH3673oTsHN+d
+            uBd5uyrlnGjWjuiMKv2TPITZcWBjB8nJDSvLneHF59MYwejNNEof2tRjgFSdImFH
+            mi995wJBAMtPjW6wiqRz0i41VuT9ZgwACJBzOdvzQJfHgSD9qgFb1CU/J/hpSRIM
+            kYvrXK9MbvQFvG6x4VuyT1W8mpe1LK0CQAo8VPpffhFdRpF7psXLK/XQ/0VLkG3O
+            KburipLyBg/u9ZkaL0Ley5zL5dFBjTV2Qkx367Ic2b0u9AYTCcgi2DsCQQD3zZ7B
+            v7BOm7MkylKokY2MduFFXU0Bxg6pfZ7q3rvg8gqhUFbaMStPRYg6myiDiW/JfLhF
+            TcFT4touIo7oriFJ
+            -----END PRIVATE KEY-----
+          caCertificate: |-
+            -----BEGIN CERTIFICATE-----
+            MIIEFzCCAv+gAwIBAgIJALK1iUpF2VQLMA0GCSqGSIb3DQEBBQUAMIGhMQswCQYD
+            VQQGEwJVUzELMAkGA1UECAwCU0MxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoG
+            A1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDEQMA4GA1UECwwHVGVzdCBDQTEaMBgG
+            A1UEAwwRd3d3LmV4YW1wbGVjYS5jb20xIjAgBgkqhkiG9w0BCQEWE2V4YW1wbGVA
+            ZXhhbXBsZS5jb20wHhcNMTUwMTEyMTQxNTAxWhcNMjUwMTA5MTQxNTAxWjCBoTEL
+            MAkGA1UEBhMCVVMxCzAJBgNVBAgMAlNDMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkx
+            HDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQxEDAOBgNVBAsMB1Rlc3QgQ0Ex
+            GjAYBgNVBAMMEXd3dy5leGFtcGxlY2EuY29tMSIwIAYJKoZIhvcNAQkBFhNleGFt
+            cGxlQGV4YW1wbGUuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA
+            w2rK1J2NMtQj0KDug7g7HRKl5jbf0QMkMKyTU1fBtZ0cCzvsF4CqV11LK4BSVWaK
+            rzkaXe99IVJnH8KdOlDl5Dh/+cJ3xdkClSyeUT4zgb6CCBqg78ePp+nN11JKuJlV
+            IG1qdJpB1J5O/kCLsGcTf7RS74MtqMFo96446Zvt7YaBhWPz6gDaO/TUzfrNcGLA
+            EfHVXkvVWqb3gqXUztZyVex/gtP9FXQ7gxTvJml7UkmT0VAFjtZnCqmFxpLZFZ15
+            +qP9O7Q2MpsGUO/4vDAuYrKBeg1ZdPSi8gwqUP2qWsGd9MIWRv3thI2903BczDc7
+            r8WaIbm37vYZAS9G56E4+wIDAQABo1AwTjAdBgNVHQ4EFgQUugLrSJshOBk5TSsU
+            ANs4+SmJUGwwHwYDVR0jBBgwFoAUugLrSJshOBk5TSsUANs4+SmJUGwwDAYDVR0T
+            BAUwAwEB/zANBgkqhkiG9w0BAQUFAAOCAQEAaMJ33zAMV4korHo5aPfayV3uHoYZ
+            1ChzP3eSsF+FjoscpoNSKs91ZXZF6LquzoNezbfiihK4PYqgwVD2+O0/Ty7UjN4S
+            qzFKVR4OS/6lCJ8YncxoFpTntbvjgojf1DEataKFUN196PAANc3yz8cWHF4uvjPv
+            WkgFqbIjb+7D1YgglNyovXkRDlRZl0LD1OQ0ZWhd4Ge1qx8mmmanoBeYZ9+DgpFC
+            j9tQAbS867yeOryNe7sEOIpXAAqK/DTu0hB6+ySsDfMo4piXCc2aA/eI2DCuw08e
+            w17Dz9WnupZjVdwTKzDhFgJZMLDqn37HQnT6EemLFqbcR0VPEnfyhDtZIQ==
+            -----END CERTIFICATE-----
+      status: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    labels:
+      template: routeTemplate
