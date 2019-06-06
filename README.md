@@ -72,6 +72,53 @@ PBENCH_SSH_PUBLIC_KEY_FILE
 PBENCH_SERVER
 ```
 
+## RHCOS Baseline Workload
+
+The RHCOS baseline workload playbook is `workloads/baseline.yml` and will run the baseline workload on your RHCOS cluster.
+
+Running from CLI:
+
+```sh
+$ cp workloads/inventory.example inventory
+$ # Add orchestration host to inventory
+$ # Edit vars in workloads/vars/baseline.yml or define Environment vars (See below)
+$ time ansible-playbook -vv -i inventory workloads/baseline.yml
+```
+
+### Environment variables for RHCOS baseline workload playbook
+
+```
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+PUBLIC_KEY
+PRIVATE_KEY
+
+ORCHESTRATION_USER
+###############################################################################
+# RHCOS workload variables.
+###############################################################################
+WORKLOAD_IMAGE
+
+WORKLOAD_JOB_NODE_SELECTOR
+WORKLOAD_JOB_TAINT
+WORKLOAD_JOB_PRIVILEGED
+
+KUBECONFIG_FILE
+
+PBENCH_SSH_PRIVATE_KEY_FILE
+PBENCH_SSH_PUBLIC_KEY_FILE
+ENABLE_PBENCH_AGENTS
+PBENCH_SERVER
+
+SCALE_CI_RESULTS_TOKEN
+JOB_COMPLETION_POLL_ATTEMPTS
+
+# Baseline workload specific parameters:
+BASELINE_TEST_PREFIX
+BASELINE_WORKLOAD_DURATION
+```
+
 ## RHCOS NodeVertical Workload
 
 The RHCOS nodevertical workload playbook is `workloads/nodevertical.yml` and will run the nodevertical workload on your RHCOS cluster.
