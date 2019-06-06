@@ -1,0 +1,491 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    source /root/workload/functions.sh
+    # pbench Configuration
+    log "Configuring pbench for Network benchmarks"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    log "Done configuring pbench Network benchmarks"
+    # End pbench Configuration
+
+    # Start of Test Code
+    log "Running Network benchmarks"
+
+    config_prefix="P2P"
+    cp /root/workload/pod-rc-template.yaml /tmp/pod-rc-template.yaml
+    if [[ "${NETWORK_TEST_HOSTNETWORK}" == "true" ]]; then
+      config_prefix="P2P_HN"
+      envsubst < /root/workload/network-scc.yaml.template > /tmp/network-scc.yaml
+      oc replace --force -f /tmp/network-scc.yaml
+      cp /root/workload/pod-hn-rc-template.yaml /tmp/pod-rc-template.yaml
+    fi
+    # Loop over pair count
+    for pair_count in ${NETWORK_TEST_PAIRS//,/ }
+    do
+      log "Running Network benchmarks with ${pair_count} pair(s)"
+      if [ "${NETWORK_TEST_SERVICE}" == "true" ]; then
+        config_prefix="S2S"
+        PAIR_COUNT=${pair_count} envsubst < /root/workload/s2s-network.yaml.template > /tmp/network.yaml
+        cp /root/workload/svc-template.yaml /tmp/svc-template.yaml
+        # Append required ports to service template
+        for i in `seq ${NETWORK_TEST_UPERF_PORT_RANGE}`
+        do
+          echo -e "    - name: tcp-${i}\n      port: ${i}\n      protocol: TCP" >> /tmp/svc-template.yaml
+          echo -e "    - name: udp-${i}\n      port: ${i}\n      protocol: UDP" >> /tmp/svc-template.yaml
+        done
+      else
+        PAIR_COUNT=${pair_count} envsubst < /root/workload/p2p-network.yaml.template > /tmp/network.yaml
+      fi
+
+      VIPERCONFIG=/tmp/network.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"
+
+      # Check if clients and servers are ready
+      for rc_num in `seq 0 $((${pair_count} - 1))`
+      do
+        is_replica_ready "uperf-client-${rc_num}"
+        is_replica_ready "uperf-server-${rc_num}"
+      done
+
+      if [ "${NETWORK_TEST_SERVICE}" == "true" ]; then
+        clients=`oc get svc --output=json -n ${NETWORK_TEST_BASENAME}0 --selector="name=client" | jq -r '[.items[].spec.clusterIP] | join(",")'`
+        servers=`oc get svc --output=json -n ${NETWORK_TEST_BASENAME}0 --selector="name=server" | jq -r '[.items[].spec.clusterIP] | join(",")'`
+      else
+        clients=`oc get pods --output=json -n ${NETWORK_TEST_BASENAME}0 --selector="name=client" | jq -r '[.items[].status.podIP] | join(",")'`
+        servers=`oc get pods --output=json -n ${NETWORK_TEST_BASENAME}0 --selector="name=server" | jq -r '[.items[].status.podIP] | join(",")'`
+      fi
+
+      mv ~/.ssh/config ~/.ssh/config.bak || true
+      for host in $(echo "${clients} ${servers}" | sed "s/,/ /g")
+      do
+        HOST=${host} envsubst < /root/workload/ssh_config.template >> ~/.ssh/config
+      done
+      cat ~/.ssh/config.bak >> ~/.ssh/config || true
+      chmod 0600 ~/.ssh/config
+
+      pbench-uperf --test-types=${NETWORK_TEST_TYPE} \
+        --runtime=${NETWORK_TEST_RUNTIME} \
+        --message-sizes=${NETWORK_TEST_MESSAGE_SIZES} \
+        --protocols=${NETWORK_TEST_PROTOCOL} \
+        --instances=${NETWORK_TEST_INSTANCES} \
+        --samples=${NETWORK_TEST_SAMPLES} \
+        --max-stddev=10 \
+        --clients=${clients} \
+        --servers=${servers} \
+        --config=${config_prefix}_${pair_count}p_${NETWORK_TEST_INSTANCES//,/_}i_${NETWORK_TEST_PROTOCOL/,/_}
+
+      # Clean up project
+      if [[ "${NETWORK_TEST_CLEANUP}" == "true" ]]; then
+        oc delete project "${NETWORK_TEST_BASENAME}0"
+        retries=0
+        while [ $retries -le 60 ] ; do
+          remaining_projects=`oc get projects --no-headers | egrep "^${NETWORK_TEST_BASENAME}0 " -c || true`
+          log "Deleting ${NETWORK_TEST_BASENAME}0 project..."
+          if [ $remaining_projects -eq 0 ]; then
+            break
+          fi
+          sleep 2
+          retries=$[$retries + 1]
+        done
+        if [ ${remaining_projects} -gt 0 ]; then
+          log "Failed to clean up ${NETWORK_TEST_BASENAME}0 project"
+          exit 1
+        fi
+      else
+        log "Clean up skipped"
+      fi
+
+      pbench-copy-results --prefix "${NETWORK_TEST_PREFIX}"
+      log "Completed Network benchmarks with ${pair_count} pair(s)"
+    done
+    log "Completed Network benchmarks"
+    # End of Test Code
+  functions.sh: |
+    #!/bin/sh
+    log () {
+      echo "$(date -u) $1" 1>&2
+    }
+
+    is_replica_ready() {
+      retries=0
+      while [ $retries -le 60 ] ; do
+        client_ready=`oc get replicationcontroller/$1 -o json -n ${NETWORK_TEST_BASENAME}0 | jq '.status.replicas==.status.availableReplicas'`
+        if [ "${client_ready}" == "true" ]; then
+          log "$1 is ready"
+          break
+        else
+          log "Waiting for $1 to be ready"
+          sleep 2
+        fi
+        retries=$[$retries + 1]
+      done
+      if [ "${client_ready}" == "false" ]; then
+        log "$1 failed to be ready on time"
+        exit 1
+      fi
+    }
+
+  p2p-network.yaml.template: |
+    provider: local
+    ClusterLoader:
+      cleanup: false
+      projects:
+      - num: 1
+        basename: "${NETWORK_TEST_BASENAME}"
+        ifexists: delete
+        templates:
+        - num: 1
+          file: /root/workload/pbench-ssh.yaml
+          parameters:
+          - SSH_AUTHORIZED_KEYS: "${NETWORK_SSH_AUTHORIZED_KEYS}"
+          - SSH_PRIVATE_KEY: "${NETWORK_SSH_PRIVATE_KEY}"
+          - SSH_PUBLIC_KEY: "${NETWORK_SSH_PUBLIC_KEY}"
+        - num: ${PAIR_COUNT}
+          file: /tmp/pod-rc-template.yaml
+          parameters:
+          - NS_VALUE: "server"
+          - UPERF_IMAGE: ${NETWORK_TEST_UPERF_IMAGE}
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+        - num: ${PAIR_COUNT}
+          file: /tmp/pod-rc-template.yaml
+          parameters:
+          - NS_VALUE: "client"
+          - UPERF_IMAGE: ${NETWORK_TEST_UPERF_IMAGE}
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+  s2s-network.yaml.template: |
+    provider: local
+    ClusterLoader:
+      cleanup: false
+      projects:
+      - num: 1
+        basename: "${NETWORK_TEST_BASENAME}"
+        ifexists: delete
+        templates:
+        - num: 1
+          file: /root/workload/pbench-ssh.yaml
+          parameters:
+          - SSH_AUTHORIZED_KEYS: ${NETWORK_SSH_AUTHORIZED_KEYS}
+          - SSH_PRIVATE_KEY: ${NETWORK_SSH_PRIVATE_KEY}
+          - SSH_PUBLIC_KEY: ${NETWORK_SSH_PUBLIC_KEY}
+        - num: ${PAIR_COUNT}
+          file: /tmp/svc-template.yaml
+          parameters:
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+          - ROLE: "server"
+        - num: ${PAIR_COUNT}
+          file: /root/workload/pod-rc-template.yaml
+          parameters:
+          - NS_VALUE: "server"
+          - UPERF_IMAGE: ${NETWORK_TEST_UPERF_IMAGE}
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+          - SYSCTL_LOCAL_PORT_RANGE: ${NETWORK_TEST_UPERF_PORT_RANGE}
+        - num: ${PAIR_COUNT}
+          file: /tmp/svc-template.yaml
+          parameters:
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+          - ROLE: "client"
+        - num: ${PAIR_COUNT}
+          file: /root/workload/pod-rc-template.yaml
+          parameters:
+          - NS_VALUE: "client"
+          - UPERF_IMAGE: ${NETWORK_TEST_UPERF_IMAGE}
+          - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
+          - SYSCTL_LOCAL_PORT_RANGE: ${NETWORK_TEST_UPERF_PORT_RANGE}
+  network-scc.yaml.template: |
+    ---
+    kind: SecurityContextConstraints
+    apiVersion: v1
+    metadata:
+      name: uperf
+    priority:
+    allowPrivilegedContainer: ${NETWORK_TEST_HOSTNETWORK}
+    defaultAddCapabilities:
+    allowedCapabilities:
+    allowHostDirVolumePlugin: false
+    allowHostNetwork: ${NETWORK_TEST_HOSTNETWORK}
+    allowHostPorts: false
+    allowHostPID: false
+    allowHostIPC: false
+    seLinuxContext:
+      type: RunAsAny
+    runAsUser:
+      type: RunAsAny
+    supplementalGroups:
+      type: RunAsAny
+    fsGroup:
+      type: RunAsAny
+    groups:
+    - system:authenticated
+  pod-rc-template.yaml: |
+    ---
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: uperf
+      annotations:
+        description: A template for creating an uperf replicationcontroller
+        tags: uperf,perf
+    labels:
+      template: uperf
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        labels:
+          name: "${NS_VALUE}"
+          svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+        name: "uperf-${NS_VALUE}-${IDENTIFIER}"
+      spec:
+        replicas: 1
+        selector:
+          name: "${NS_VALUE}"
+          svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+        template:
+          metadata:
+            labels:
+              name: "${NS_VALUE}"
+              svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+            name: uperf
+          spec:
+            hostNetwork: false
+            containers:
+            - name: "uperf-${NS_VALUE}"
+              image: "${UPERF_IMAGE}"
+              imagePullPolicy: Always
+              env:
+              - name: UPERF_SSH_PORT
+                value: "${UPERF_SSHD_PORT}"
+              securityContext:
+                privileged: false
+              volumeMounts:
+              - name: pbench-ssh
+                mountPath: /.ssh/authorized_keys
+                subPath: authorized_keys
+              - name: pbench-ssh
+                mountPath: /root/.ssh/authorized_keys
+                subPath: authorized_keys
+              - name: pbench-results
+                mountPath: /var/lib/pbench-agent
+            dnsPolicy: ClusterFirst
+            nodeSelector:
+              uperf: "${NS_VALUE}"
+            securityContext:
+              sysctls:
+              - name: net.ipv4.ip_local_port_range
+                value: "${SYSCTL_LOCAL_PORT_RANGE}"
+            restartPolicy: Always
+            volumes:
+            - name: pbench-ssh
+              secret:
+                secretName: pbench-ssh
+                defaultMode: 0600
+            - name: pbench-results
+              emptyDir: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: "1"
+      required: true
+    - name: NS_VALUE
+      description: Which NodeSelector value to use (client, server)
+      value: "client"
+      required: true
+    - name: UPERF_IMAGE
+      description: Which uperf container image to be used in this pod
+      value: "quay.io/openshift-scale/scale-ci-uperf"
+      required: true
+    - name: UPERF_SSHD_PORT
+      description: What port should the sshd process in the uperf container listen on
+      value: "20000"
+      required: true
+    - name: SYSCTL_LOCAL_PORT_RANGE
+      description: Set the net.ipv4.ip_local_port_range for the container
+      value: "32768 60999"
+      required: true
+  pod-hn-rc-template.yaml: |
+    ---
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: uperf
+      annotations:
+        description: A template for creating an uperf replicationcontroller with hostnetwork
+        tags: uperf,perf
+    labels:
+      template: uperf
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        labels:
+          name: "${NS_VALUE}"
+          svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+        name: "uperf-${NS_VALUE}-${IDENTIFIER}"
+      spec:
+        replicas: 1
+        selector:
+          name: "${NS_VALUE}"
+          svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+        template:
+          metadata:
+            labels:
+              name: "${NS_VALUE}"
+              svc_selector: "${NS_VALUE}-${IDENTIFIER}"
+            name: uperf
+          spec:
+            hostNetwork: true
+            containers:
+            - name: "uperf-${NS_VALUE}"
+              image: "${UPERF_IMAGE}"
+              imagePullPolicy: Always
+              env:
+              - name: UPERF_SSH_PORT
+                value: "${UPERF_SSHD_PORT}"
+              securityContext:
+                privileged: true
+              volumeMounts:
+              - name: pbench-ssh
+                mountPath: /.ssh/authorized_keys
+                subPath: authorized_keys
+              - name: pbench-ssh
+                mountPath: /root/.ssh/authorized_keys
+                subPath: authorized_keys
+              - name: pbench-results
+                mountPath: /var/lib/pbench-agent
+            dnsPolicy: ClusterFirst
+            nodeSelector:
+              uperf: "${NS_VALUE}"
+            restartPolicy: Always
+            volumes:
+            - name: pbench-ssh
+              secret:
+                secretName: pbench-ssh
+                defaultMode: 0600
+            - name: pbench-results
+              emptyDir: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: "1"
+      required: true
+    - name: NS_VALUE
+      description: Which NodeSelector value to use (client, server)
+      value: "client"
+      required: true
+    - name: UPERF_IMAGE
+      description: Which uperf container image to be used in this pod
+      value: "quay.io/openshift-scale/scale-ci-uperf"
+      required: true
+    - name: UPERF_SSHD_PORT
+      description: What port should the sshd process in the uperf container listen on
+      value: "20000"
+      required: true
+  pbench-ssh.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: sshSecretTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a single secret.
+        tags: ''
+    objects:
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          name: pbench-ssh
+        type: Opaque
+        data:
+          authorized_keys: "${SSH_AUTHORIZED_KEYS}"
+          id_rsa: "${SSH_PRIVATE_KEY}"
+          id_rsa.pub: "${SSH_PUBLIC_KEY}"
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: "1"
+      required: true
+    - name: SSH_AUTHORIZED_KEYS
+      description: Authorized key file encoded for a secret
+      required: true
+    - name: SSH_PRIVATE_KEY
+      description: Number to append to the name of resources
+      required: true
+    - name: SSH_PUBLIC_KEY
+      description: Number to append to the name of resources
+      required: true
+  ssh_config.template: |
+    Host ${HOST}
+      User default
+      Port ${NETWORK_TEST_UPERF_SSHD_PORT}
+      StrictHostKeyChecking no
+      PasswordAuthentication no
+      UserKnownHostsFile /dev/null
+      IdentityFile ~/.ssh/id_rsa
+  svc-template.yaml: |
+    ---
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: uperf
+      annotations:
+        description: A template for creating resources for network testing
+        tags: uperf,networking
+    labels:
+      template: uperf
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: "1"
+      required: true
+    - name: UPERF_SSHD_PORT
+      description: What port should the sshd process in the uperf container listen on
+      value: "20000"
+      required: true
+    - name: ROLE
+      description: Role for the service, either client or server
+      required: true
+    objects:
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        labels:
+          name: "${ROLE}"
+          svc_selector: "${ROLE}-${IDENTIFIER}"
+        annotations:
+          description: Exposes and load balances the application pods
+        name: uperf-${ROLE}-${IDENTIFIER}
+      spec:
+        selector:
+          name: "${ROLE}"
+          svc_selector: "${ROLE}-${IDENTIFIER}"
+        ports:
+        - name: ssh
+          port: ${{UPERF_SSHD_PORT}}

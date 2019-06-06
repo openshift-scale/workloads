@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-network-env
+data:
+  NETWORK_TEST_UPERF_IMAGE: "{{network_test_uperf_image}}"
+  NETWORK_TEST_UPERF_SSHD_PORT: "{{network_test_uperf_sshd_port}}"
+  NETWORK_TEST_UPERF_PORT_RANGE: "{{network_test_uperf_port_range}}"
+  NETWORK_TEST_PREFIX: "{{network_test_prefix}}"
+  NETWORK_TEST_PAIRS: "{{network_test_pairs}}"
+  NETWORK_TEST_BASENAME: "{{network_test_basename}}"
+  NETWORK_TEST_HOSTNETWORK: "{{network_test_hostnetwork}}"
+  NETWORK_TEST_SERVICE: "{{network_test_service}}"
+  NETWORK_TEST_TYPE: "{{network_test_type}}"
+  NETWORK_TEST_RUNTIME: "{{network_test_runtime}}"
+  NETWORK_TEST_MESSAGE_SIZES: "{{network_test_message_sizes}}"
+  NETWORK_TEST_PROTOCOL: "{{network_test_protocol}}"
+  NETWORK_TEST_INSTANCES: "{{network_test_instances}}"
+  NETWORK_TEST_SAMPLES: "{{network_test_samples}}"
+  NETWORK_TEST_CLEANUP: "{{network_test_cleanup}}"
+  NETWORK_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
+  NETWORK_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
+  NETWORK_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
