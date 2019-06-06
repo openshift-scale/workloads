@@ -227,3 +227,66 @@ MASTERVERTICAL_CLEANUP
 MASTERVERTICAL_BASENAME
 MASTERVERTICAL_PROJECTS
 ```
+
+## RHCOS HTTP Workload
+
+The RHCOS HTTP workload playbook is `workloads/http.yml` and will run the HTTP(s) workload on your RHCOS cluster.
+
+Running from CLI:
+
+```sh
+$ cp workloads/inventory.example inventory
+$ # Add orchestration host to inventory
+$ # Edit vars in workloads/vars/http.yml or define Environment vars (See below)
+$ time ansible-playbook -vv -i inventory workloads/http.yml
+```
+
+### Environment variables for RHCOS HTTP workload playbook
+
+```
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+PUBLIC_KEY
+PRIVATE_KEY
+
+ORCHESTRATION_USER
+###############################################################################
+# RHCOS workload variables.
+###############################################################################
+WORKLOAD_IMAGE
+
+KUBECONFIG_FILE
+
+PBENCH_SSH_PRIVATE_KEY_FILE
+PBENCH_SSH_PUBLIC_KEY_FILE
+ENABLE_PBENCH_AGENTS
+PBENCH_SERVER
+
+SCALE_CI_RESULTS_TOKEN
+JOB_COMPLETION_POLL_ATTEMPTS
+
+# HTTP workload specific parameters:
+TEST_CFG
+PBENCH_USE
+PBENCH_SCRAPER_USE
+CLEAR_RESULTS
+MOVE_RESULTS
+SERVER_RESULTS
+SERVER_RESULTS_SSH_KEY
+LOAD_GENERATORS
+LOAD_GENERATOR_NODES
+CL_PROJECTS
+CL_TEMPLATES
+RUN_TIME
+MB_DELAY
+MB_TLS_SESSION_REUSE
+MB_METHOD
+MB_RESPONSE_SIZE
+MB_REQUEST_BODY_SIZE
+ROUTE_TERMINATION
+SMOKE_TEST
+NAMESPACE_CLEANUP
+HTTP_STRESS_CONTAINER_IMAGE
+HTTP_SERVER_CONTAINER_IMAGE
+```

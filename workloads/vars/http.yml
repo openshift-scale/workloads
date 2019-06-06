@@ -1,0 +1,33 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# RHCOS http workload variables.
+###############################################################################
+
+# Container image in use
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+# Kubeconfig for tooling container script
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(1000, true)|int }}"
+
+# HTTP workload specific parameters
+http_env_vars: [ "TEST_CFG", "PBENCH_USE", "PBENCH_SCRAPER_USE", "CLEAR_RESULTS", "MOVE_RESULTS", "SERVER_RESULTS",
+                 "SERVER_RESULTS_SSH_KEY", "LOAD_GENERATORS", "LOAD_GENERATOR_NODES", "CL_PROJECTS", "CL_TEMPLATES",
+                 "RUN_TIME", "MB_DELAY", "MB_TLS_SESSION_REUSE", "MB_METHOD", "MB_RESPONSE_SIZE", "MB_REQUEST_BODY_SIZE",
+                 "ROUTE_TERMINATION", "SMOKE_TEST", "NAMESPACE_CLEANUP", "HTTP_STRESS_CONTAINER_IMAGE", "HTTP_SERVER_CONTAINER_IMAGE" ]

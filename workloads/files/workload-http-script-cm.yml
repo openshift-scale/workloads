@@ -1,0 +1,1232 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/bash
+    set -e
+    # pbench Configuration
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/master= | grep master | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/infra= | grep infra | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    # End pbench Configuration
+
+    # Test Configuration
+    echo "$(date -u) Configuring HTTP test"
+    test_dir=/tmp/http-ci-tests
+    export HOME=$test_dir
+    mkdir -p $test_dir/content/quickstarts/{nginx,stress}
+    install -m 644 /root/workload/server-*.yaml $test_dir/content/quickstarts/nginx
+    install -m 644 /root/workload/stress-*.yaml $test_dir/content/quickstarts/stress
+    install -m 755 /root/workload/*.sh $test_dir
+    #SERVER_RESULTS=${SERVER_RESULTS:-scp://root@${OCP_NODE_NAME}:/var/lib/pbench-agent}
+    SERVER_RESULTS=${SERVER_RESULTS:-kcp://scale-ci-tooling/${OCP_POD_NAME}:/var/lib/pbench-agent}
+    # End Test Configuration
+
+    # Start of Test Code
+    echo "$(date -u) Running HTTP test"
+    cd $test_dir
+    ./http-test.sh all
+    echo "$(date -u) Completed HTTP test"
+    # End of Test Code
+
+  env.sh: |
+    # Test configuration: a label to append to pbench directories and mb result directories.
+    export TEST_CFG=${TEST_CFG:-1router}
+    # A list of paths to k8s configuration files.  Colon-delimited for Linux.
+    export KUBECONFIG=${KUBECONFIG:-/root/.kube/config}
+    # Use benchmarking and performance analysis framework Pbench.
+    export PBENCH_USE=${PBENCH_USE:-false}
+    # Pbench scraper/wedge usage for r2r analysis.
+    export PBENCH_SCRAPER_USE=${PBENCH_SCRAPER_USE:-false}
+    # Clear results from previous pbench runs.
+    export CLEAR_RESULTS=${CLEAR_RESULTS:-true}
+    # Move the benchmark results to a pbench server.
+    export MOVE_RESULTS=${MOVE_RESULTS:-false}
+    # HTTP-test specifics
+    # Endpoint for collecting results from workload generator node(s).  Keep empty if copying is not required.
+    # - scp://[user@]server:[path]
+    # - kcp://[namespace/]pod:[path]
+    # Note: when PBENCH_USE=true, path is overriden by benchmark_run_dir environment variable
+    export SERVER_RESULTS=${SERVER_RESULTS}
+    # Path to private key when using scp:// to copy results to SERVER_RESULTS.  It is mounted to workload generator container(s).
+    export SERVER_RESULTS_SSH_KEY=${SERVER_RESULTS_SSH_KEY:-/root/.ssh/id_rsa}
+    # How many workload generators to use.
+    export LOAD_GENERATORS=${LOAD_GENERATORS:-1}
+    # Load-generator nodes described by an extended regular expression (use "oc get nodes" node names).
+    # If unset/empty, do not pin the workload generators to any nodes.
+    export LOAD_GENERATOR_NODES=${LOAD_GENERATOR_NODES:-}
+    # Number of projects to create for each type of application (4 types currently).
+    export CL_PROJECTS=${CL_PROJECTS:-10}
+    # Number of templates to create per project.
+    export CL_TEMPLATES=${CL_TEMPLATES:-1}
+    # Run time of individual HTTP test iterations in seconds.
+    export RUN_TIME=${RUN_TIME:-120}
+    # Maximum delay between client requests in ms.
+    export MB_DELAY=${MB_DELAY:-0}
+    # Use TLS session reuse.
+    export MB_TLS_SESSION_REUSE=${MB_TLS_SESSION_REUSE:-true}
+    # HTTP method to use for backend servers (GET/POST).
+    export MB_METHOD=${MB_METHOD:-GET}
+    # Backend server (200 OK) response document length.
+    export MB_RESPONSE_SIZE=${MB_RESPONSE_SIZE:-1024}
+    # Body length of POST requests in characters for backend servers.
+    export MB_REQUEST_BODY_SIZE=${MB_REQUEST_BODY_SIZE:-1024}
+    # Perform the test for the following (comma-separated) route terminations: mix,http,edge,passthrough,reencrypt
+    export ROUTE_TERMINATION=${ROUTE_TERMINATION:-mix}
+    # Run only a single HTTP test to establish functionality.  It also overrides CL_PROJECTS and CL_TEMPLATES.
+    export SMOKE_TEST=${SMOKE_TEST:-false}
+    # Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
+    export NAMESPACE_CLEANUP=${NAMESPACE_CLEANUP:-true}
+    # HTTP workload generator container image
+    export HTTP_STRESS_CONTAINER_IMAGE=${HTTP_STRESS_CONTAINER_IMAGE:-quay.io/openshift-scale/http-stress}
+    # HTTP server container image
+    export HTTP_SERVER_CONTAINER_IMAGE=${HTTP_SERVER_CONTAINER_IMAGE:-quay.io/openshift-scale/nginx}
+
+  http-test.sh: |
+    #!/bin/bash
+
+    ProgramName=${0##*/}
+
+    . ./env.sh
+
+    ### Global variables ###########################################################
+    param_name=()			# parameters, name
+    param_fn=()			# parameters, function name
+    param_hlp=()			# parameters, help
+    http_pod_label=test=http	# label for application pods
+    http_server=nginx		# backend server for http tests (h2o|nginx)
+    declare -a a_region		# array of old node region labels
+
+    # pbench-specific variables ####################################################
+    wlg_run=./wlg-run.sh
+    wlg_run_pbench=./wlg-run-pbench.sh
+    file_total_rps=rps.txt
+    file_total_latency=latency_95.txt
+    file_quit=quit				# if this file is detected during test runs, abort
+
+    # mb-specific variables ########################################################
+    routes_file=routes.txt		# a file with routes to pass to cluster loader
+    : ${RUN_TIME:=120}		# benchmark run-time in seconds
+    : ${MB_TLS_SESSION_REUSE:=true}	# use TLS session reuse [yn]
+    : ${MB_METHOD:=GET}		# HTTP method to use for backend servers (GET/POST)
+    : ${MB_RESPONSE_SIZE:=1024}	# backend server (200 OK) response document length
+    : ${MB_REQUEST_BODY_SIZE:=1024}	# body length of POST requests in characters for backend servers
+
+    ### Functions ##################################################################
+    fail() {
+      echo $@ >&2
+    }
+
+    warn() {
+      fail "$ProgramName: $@"
+    }
+
+    die() {
+      local err=$1
+      shift
+      fail "$ProgramName: $@"
+      exit $err
+    }
+
+    usage() {
+      local err="$1"
+      local key hlp
+      local i=0
+
+      cat <<_HLP1_ 1>&2
+    Usage: $ProgramName [options] [tasks]
+
+    Options:
+      --help, -h        this help
+
+    Tasks:
+     all: Run all tasks involved in setting up the environment and running the tests.
+    _HLP1_
+
+      for key in "${param_name[@]}" ; do
+        hlp="${param_hlp[$i]}"
+        ((i++))
+        cat <<_HLP2_ 1>&2
+     $key: $hlp
+    _HLP2_
+      done
+
+      test "$err" && exit $err
+    }
+
+    param_set() {
+      local param fn hlp
+      local i=0
+      local old_ifs="$IFS"
+      IFS='|'
+      while read -r param fn hlp ; do
+        test ${param:0:1} = "#" && continue
+        param_name[$i]="$param"
+        param_fn[$i]="$fn"
+        param_hlp[$i]="$hlp"
+        ((i++))
+      done << _PARAM_
+    environment-dump|environment_dump|Dump the environment for the purposes of re-running some of the test iterations manually.
+    router_liveness_probe-disable|router_liveness_probe|Increase period seconds for the router liveness probe.
+    load_generator-label|load_generator_nodes_label|Label and taint the node(s) for the load generator pod(s).
+    pbench-clear-results|pbench_clear_results|Clear results from previous pbench runs.
+    cluster-load|cl_load|Populate the cluster with application pods and routes.
+    benchmark-run|benchmark_run|Run the HTTP(s) benchmark against routes in '$routes_file'.
+    process-results|process_results|Process results collected in the benchmark run.
+    results-move|pbench_move_results|Move the benchmark results to a pbench server.
+    load_generator-unlabel|load_generator_nodes_unlabel|Unlabel and remove taints on the node(s) for the load generator pod(s).
+    namespace-cleanup|namespace_cleanup|Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
+    _PARAM_
+      IFS="$old_ifs"
+    }
+
+    param2fn() {
+      local param="$1"
+      local key fn
+      local i=0
+
+      for key in "${param_name[@]}" ; do
+        if test "$key" = "$param" ; then
+          fn="${param_fn[$i]}"
+          echo "$fn"
+          return 0
+        fi
+        ((i++))
+      done
+
+      return 1
+    }
+
+    shell_expand_file() {
+      local file="$1"
+      local data=$(< "$file")
+      local delimiter="__shell_expand_file__"
+      local command="cat <<$delimiter"$'\n'"$data"$'\n'"$delimiter"
+      eval "$command"
+    }
+
+    environment_dump() {
+      shell_expand_file env.sh > env-dump.sh
+    }
+
+    check_admin() {
+      local oc_whoami=`oc whoami`
+      local oc_admin_user=system:admin
+
+      test "$oc_whoami" = "$oc_admin_user"
+    }
+
+    # Increase period seconds for the router liveness probe.
+    router_liveness_probe() {
+      local deployment selector d probe_set
+
+      check_admin || {
+        echo "Not changing liveness probe, cluster admin needed."
+        return
+      }
+
+      # Increase period seconds for the router liveness probe.
+      for deployment in dc deployment
+      do
+        for selector in router=router app=router ingress.openshift.io/clusteringress=default ingresscontroller.operator.openshift.io/owning-ingresscontroller=default
+        do
+          for d in $(oc get $deployment --selector=$selector --template='{{range .items}}{{.metadata.name}}|{{.metadata.namespace}}{{"\n"}}{{end }}' --all-namespaces)
+          do
+            set -- ${d//|/ }
+            d_name=$1
+            d_namespace=$2
+            oc set probe $deployment/$d_name --liveness --period-seconds=$RUN_TIME -n=$d_namespace
+            # Alternatively, delete the router liveness probe.
+            #oc set probe $deployment/$d_name --liveness --remove -n=$d_namespace
+            probe_set=true
+          done
+        done
+      done
+
+      test "$probe_set" || die 1 "Couldn't set router liveness probe."
+    }
+
+    load_generator_nodes_get() {
+      oc get nodes --no-headers | awk '{print $1}' | grep -E "${LOAD_GENERATOR_NODES}"
+    }
+
+    results_dir_get() {
+      local pbench_agent_dir=/var/lib/pbench-agent
+      local server_results_dir=$(echo ${SERVER_RESULTS:6} | cut -d: -f2-)
+
+      # scp://user@server:
+      test -z "$server_results_dir" && server_results_dir=$HOME
+      # scp://user@server   (invalid spec, colon is required!)
+      test "$server_results_dir" = "${SERVER_RESULTS:6}" && server_results_dir=$pbench_agent_dir
+      test "${PBENCH_USE}" = true && server_results_dir=$pbench_agent_dir
+
+      echo $server_results_dir
+      return
+    }
+
+    load_generator_nodes_label_taint() {
+      local label="${1:-y}" # unlabel/remove taint if not 'y'
+      local i node placement taint region region_old
+      local oc_whoami=`oc whoami`
+
+      test "$LOAD_GENERATOR_NODES" || {
+        echo "Not (un)labelling nodes, load generator nodes unspecified."
+        return
+      }
+
+      check_admin || {
+        echo "Not (un)labelling nodes, cluster admin needed."
+        return
+      }
+
+      if test "$label" = y ; then
+        placement=test=wlg
+        taint=test=wlg:NoSchedule
+      else
+        placement=test-
+        taint=test-
+      fi
+
+      i=0
+      for node in $(load_generator_nodes_get) ; do
+        if test "$label" = y ; then
+          # save old region
+          a_region[$i]=$(oc get node "$node" --template '{{printf "%s\n" .metadata.labels.region}}')
+          region=region=primary
+        else
+          # get old region from "stored regions" array
+          region=region=${a_region[$i]:-primary}
+        fi
+        oc label node $node $placement --overwrite
+        oc label node $node $region --overwrite
+        oc adm taint nodes $node $taint
+        ((i++))
+      done
+    }
+
+    # Label and taint the node(s) for the load generator pod(s).
+    load_generator_nodes_label() {
+      load_generator_nodes_label_taint y
+    }
+
+    # Unlabel and remove taints on the node(s) for the load generator pod(s).
+    load_generator_nodes_unlabel() {
+      load_generator_nodes_label_taint n
+    }
+
+    # Clear results from previous pbench runs.
+    pbench_clear_results() {
+      test "${PBENCH_USE}" = true || return
+
+      if test "${CLEAR_RESULTS}" = "true" ; then
+        pbench-clear-results
+      fi
+    }
+
+    cl_max_pods_not_running() {
+      local max_not_running="${1:-20}"
+      local project="${2:-default}"
+      local not_running
+
+      while true ; do
+        not_running=$(oc get pods --selector $http_pod_label --no-headers -n=$project | grep -E -v '(Running|Completed|Unknown)' -c)
+        test "$not_running" -le "$max_not_running" && break
+        echo "$not_running pods not running"
+        sleep 1
+      done
+    }
+
+    cl_new_project_or_reuse() {
+      local project="$1"
+      local res
+
+      if oc get project $project >/dev/null 2>&1 ; then
+        # $project exists, recycle it
+        # switch to the new project if we do not have access to the current project, note that `oc project` returns 0 when no project has been set!
+        test $(oc project -q 2>/dev/null | wc -l) -eq 1 || oc project $project
+        for res in rc dc bc pod service route ; do
+          oc delete $res --all -n=$project >/dev/null 2>&1
+        done
+      else
+        # $project doesn't exist
+        oc new-project $project --skip-config-write
+      fi
+    }
+
+    # Populate the cluster with application pods and routes.
+    cl_load() {
+      local server_quickstart_dir="content/quickstarts/$http_server"
+      local templates="$server_quickstart_dir/server-http.yaml $server_quickstart_dir/server-tls-edge.yaml $server_quickstart_dir/server-tls-passthrough.yaml $server_quickstart_dir/server-tls-reencrypt.yaml"
+      local projects=${CL_PROJECTS:-10}		# 10, 30, 60, 180
+      local project_start=1
+      local templates_total=${CL_TEMPLATES:-50}	# number of templates per project
+      local templates_start=1			# do not change or read the code to make sure it does what you want
+
+      local project project_basename template p p_f i i_f
+
+      test "${SMOKE_TEST}" = true && {
+        # override the number of projects and templates if this is just a smoke test
+        projects=2
+        templates_total=2
+      }
+
+      for template in $templates ; do
+        for p in $(seq $project_start $projects) ; do
+          p_f=$(printf "%03d" $p)
+          project_basename=${template##*/}
+          project_basename=${project_basename%%.*}-
+          project=${project_basename}$p_f
+          if test "$templates_start" -eq 1 ; then
+            cl_new_project_or_reuse $project
+          fi
+          i=$templates_start
+          while test $i -le $templates_total
+          do
+            i_f=$(printf "%03d" $i)
+            oc process \
+              -pIDENTIFIER=$i_f \
+              -pHTTP_SERVER_CONTAINER_IMAGE=$HTTP_SERVER_CONTAINER_IMAGE \
+              -f $template \
+              -n=$project | oc create -f- -n=$project
+            i=$((i+1))
+
+            cl_max_pods_not_running 20 $project
+          done
+        done
+      done
+    }
+
+    pbench_user_benchmark() {
+      local benchmark_test_config="$1"
+
+      echo "Starting Pbench on `hostname`"
+      # a regular pbench run
+      if test "${PBENCH_SCRAPER_USE}" = true ; then
+        pbench-user-benchmark \
+          -C "$benchmark_test_config" \
+          --pbench-post='/usr/local/bin/pbscraper -i $benchmark_results_dir/tools-default -o $benchmark_results_dir; ansible-playbook -vv -i /root/svt/utils/pbwedge/hosts /root/svt/utils/pbwedge/main.yml -e new_file=$benchmark_results_dir/out.json -e git_test_branch='http_$benchmark_test_config \
+          -- $wlg_run_pbench
+      else
+        pbench-user-benchmark -C "$benchmark_test_config" -- $wlg_run_pbench
+      fi
+    }
+
+    # Run the HTTP(s) benchmark against routes in '$routes_file'.
+    benchmark_run() {
+      local routes routes_f delay_f mb_conns_per_target conns_per_thread_f ka_f now benchmark_test_config
+      local router_term mb_targets load_generator_nodes
+      local run_log=run.log			# a log file for non-pbench runs
+      local ret				# return value
+      local benchmark_iteration_sleep=30	# sleep for some time between test iterations
+      local mb_tls_session_reuse=n
+
+      rm -f $run_log
+
+      test "${LOAD_GENERATORS}" -ge 1 || die 1 "workload generator count (${LOAD_GENERATORS}) is not >= 1"
+
+      test "${MB_TLS_SESSION_REUSE}" = true && mb_tls_session_reuse=y
+
+      # All possible route terminations are: mix,http,edge,passthrough,reencrypt
+      # For the purposes of CI, use "mix" only
+      for route_term in ${ROUTE_TERMINATION//,/ } ; do
+        case $route_term in
+          mix) mb_targets="(http|edge|passthrough|reencrypt)-0.1[.] (http|edge|passthrough|reencrypt)-0.[0-9][.]"	# don't use "\.", issues with yaml files
+          ;;
+          http) mb_targets="http-0.[0-9][.]"
+          ;;
+          edge) mb_targets="edge-0.[0-9][.]"
+          ;;
+          passthrough) mb_targets="passthrough-0.[0-9][.]"
+          ;;
+          reencrypt) mb_targets="reencrypt-0.[0-9][.]"
+          ;;
+        esac
+
+        for MB_TARGETS in $mb_targets ; do
+          # get all the routes from all namespaces we know about (don't rely on --all-namespaces, we might not have access to resources at cluster scope)
+          rm -f $routes_file
+          for p in $(oc get projects -o template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | \
+                       grep -E '^server-(http|tls-(edge|passthrough|reencrypt))-[0-9]+$')
+          do
+            oc get routes -n=$p --no-headers | awk "/${MB_TARGETS}/"'{print $2}' >> $routes_file
+          done
+
+          routes=$(wc -l < $routes_file)
+
+          test "${routes:-0}" -eq 0 && {
+            warn "no routes to test against"
+            continue
+          }
+          routes_f=$(printf "%04d" $routes)
+
+          for MB_DELAY in 0 ; do
+            delay_f=$(printf "%04d" $MB_DELAY)
+
+            # make sure you set 'net.ipv4.ip_local_port_range = 1024 65535' on the client machine
+            if   test $routes -le 100 ; then
+              mb_conns_per_target="1 40 200"
+            elif test $routes -le 500 ; then
+              mb_conns_per_target="1 20 80"
+            elif test $routes -le 1000 ; then
+              mb_conns_per_target="1 20 40"
+            elif test $routes -le 2000 ; then
+              mb_conns_per_target="1 10 20"
+            else
+              mb_conns_per_target="1"
+            fi
+
+            for MB_CONNS_PER_TARGET in $mb_conns_per_target ; do
+              conns_per_thread_f=$(printf "%03d" $MB_CONNS_PER_TARGET)
+              for MB_KA_REQUESTS in 1 10 100 ; do
+                ka_f=$(printf "%03d" $MB_KA_REQUESTS)
+
+                for URL_PATH in /${MB_RESPONSE_SIZE}.html ; do
+                  now=$(date '+%Y-%m-%d_%H.%M.%S')
+                  benchmark_test_config="${routes_f}r-${conns_per_thread_f}cpt-${delay_f}d_ms-${ka_f}ka-${mb_tls_session_reuse}tlsru-${RUN_TIME}s-${route_term}-${TEST_CFG}"
+                  echo "Running test with config: $benchmark_test_config"
+
+                  export RUN_TIME MB_DELAY MB_TARGETS MB_CONNS_PER_TARGET MB_METHOD MB_REQUEST_BODY_SIZE MB_KA_REQUESTS MB_TLS_SESSION_REUSE URL_PATH LOAD_GENERATORS
+
+                  if test "$PBENCH_USE" = true ; then
+                    pbench_user_benchmark "$benchmark_test_config" || die $? "Test iteration with Pbench failed with exit code: $?"
+                  else
+                    # a test run without Pbench
+                    test "$SERVER_RESULTS" && {
+                      local server_results=$(echo ${SERVER_RESULTS:6} | cut -d: -f1)
+                      local server_results_dir=$(echo ${SERVER_RESULTS:6} | cut -d: -f2-)
+                      local abs_path_prefix
+
+                      test "${server_results_dir}" && abs_path_prefix=/
+                      SERVER_RESULTS="${SERVER_RESULTS:0:6}${server_results}:${server_results_dir%/}${abs_path_prefix}$benchmark_test_config"
+                    }
+
+    		$wlg_run 2>&1 || die $? "Test iteration failed with exit code: $?"
+                  fi
+
+                  ret=$?
+                  test "$SMOKE_TEST" = true -o -e "$file_quit" && return $ret
+                  echo "sleeping $benchmark_iteration_sleep"
+                  sleep $benchmark_iteration_sleep
+                done
+              done
+            done
+          done
+        done
+      done # route_term
+    }
+
+    # Process results collected in the benchmark run.
+    process_results() {
+      local dir routes_f conns_per_thread_f delay_f ka_f tlsru_f run_time_f route_term
+      local total_hits total_rps total_latency_95 target_dir
+      local now=$(date '+%Y-%m-%d_%H.%M.%S')
+      local archive_name=http-$now-${TEST_CFG}
+      local results_dir=$(results_dir_get)
+      local out_dir=$results_dir/$archive_name
+
+      test "${SERVER_RESULTS}" || return
+
+      rm -rf $out_dir
+      for dir in $(find $results_dir -maxdepth 1 -type d -name *[0-9]r-*[0-9]cpt-*[0-9]d_ms-*[0-9]ka-ytlsru-*s-* | LC_COLLATE=C sort) ; do
+        set $(echo $dir | sed -E 's|^.*([0-9]{1,})r-([0-9]{1,})cpt-([0-9]{1,})d_ms-([0-9]{1,})ka-([yn])tlsru-([0-9]{1,})s-([^-]*)-.*$|\1 \2 \3 \4 \5 \6 \7|')
+        routes_f=$1
+        conns_per_thread_f=$2
+        delay_f=$3
+        ka_f=$4
+        tlsru_f=$5
+        run_time_f=$6
+        route_term=$7
+        echo "routes=$routes_f; conns_per_thread_f=$conns_per_thread_f; delay_f=$delay_f; ka_f=$ka_f; tlsru_f=$tlsru_f; run_time_f=$run_time_f; route_term=$route_term"
+
+        total_hits=$(awk 'BEGIN{i=0} /^200/ {i+=$2} END{print i}' $dir/mb-*/graphs/total_hits.txt 2>/dev/null)
+
+        total_rps=$(echo "scale=3; ${total_hits:-0}/$run_time_f" | bc)
+        total_latency_95=$(awk 'BEGIN{i=0} /^200/ {i=$3>i?$3:i} END{print i}' $dir/mb-*/graphs/total_latency_pctl.txt 2>/dev/null)
+        target_dir=$out_dir/processed-$route_term/${routes_f}r/${conns_per_thread_f}cpt/${ka_f}ka
+        mkdir -p $target_dir
+        if test "$total_rps" != 0 ; then
+          printf "%s\n" "$total_rps" >> $target_dir/$file_total_rps
+        fi
+        if test "$total_latency_95" ; then
+          printf "%s\n" "$total_latency_95" >> $target_dir/$file_total_latency
+        fi
+      done
+      # Tar-up the post-processed results and place them into the last directory (alphabetical sort)
+      tar Jcvf $dir/${archive_name}.tar.xz -C $results_dir $archive_name
+      echo "Processed results stored to: $dir"
+      # Remove out_dir, Pbench post-processing doesn't like random directories like this without Pbench directory structures
+      rm -rf $out_dir
+    }
+
+    # Move the benchmark results to a pbench server.
+    pbench_move_results() {
+      local now=$(date '+%Y-%m-%d_%H.%M.%S')
+
+      test "${PBENCH_USE}" = true || return
+
+      if test "${MOVE_RESULTS}" = true ; then
+        pbench-move-results --prefix="http-$now-${TEST_CFG}" 2>&1
+      fi
+    }
+
+    # Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
+    namespace_cleanup() {
+      test "${NAMESPACE_CLEANUP}" = true || return
+
+      # a user might not have the privileges to do selector-based namespace deletion, go through his/her projects and
+      # do a project-name cleanup
+      oc get projects -o template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | \
+        grep -E '^server-(http|tls-(edge|passthrough|reencrypt))-[0-9]+$' | xargs oc delete project
+    }
+
+    main() {
+      local fn
+      local i=0
+
+      for key in "${param_fn[@]}" ; do
+        fn="${param_fn[$i]}"
+        $fn
+        ((i++))
+      done
+    }
+
+    param_set
+
+    # option parsing
+    while true ; do
+      case "$1" in
+        --[Hh][Ee][Ll][Pp]|-h) usage 0
+        ;;
+
+        -*) die 1 "invalid option '$1'"
+        ;;
+
+        *)  break
+        ;;
+      esac
+      shift
+    done
+
+    # parameter/task processing
+    while test "$1" ; do
+      param="$1"
+      fn=$(param2fn $param)
+
+      if test $? -eq 0 ; then
+        $fn
+      elif test "$param" = "all" ; then
+        main
+      else
+        die 1 "don't know what to do with parameter '$param'"
+      fi
+
+      shift
+    done
+
+    test "$param" || usage 1	# no parameters passed
+
+  wlg-run-pbench.sh: |
+    #!/bin/sh
+
+    # This is a wrapper script for pbench.
+
+    main() {
+      # Show the configuration for the HTTP load generator
+      cat <<EOF
+    RUN=$RUN
+    LOAD_GENERATORS=$LOAD_GENERATORS
+    RUN_TIME=$RUN_TIME
+    MB_DELAY=$MB_DELAY
+    MB_TARGETS=$MB_TARGETS
+    MB_CONNS_PER_TARGET=$MB_CONNS_PER_TARGET
+    MB_METHOD=$MB_METHOD
+    MB_REQUEST_BODY_SIZE=$MB_REQUEST_BODY_SIZE
+    MB_KA_REQUESTS=$MB_KA_REQUESTS
+    MB_TLS_SESSION_REUSE=$MB_TLS_SESSION_REUSE
+    MB_RAMP_UP=$MB_RAMP_UP
+    URL_PATH=$URL_PATH
+    SERVER_RESULTS=$SERVER_RESULTS
+    EOF
+
+      test "$SERVER_RESULTS" && {
+        local server_results=$(echo ${SERVER_RESULTS:6} | cut -d: -f1)
+        SERVER_RESULTS="${SERVER_RESULTS:0:6}${server_results}:$benchmark_run_dir"
+      }
+
+      ./wlg-run.sh
+    }
+
+    main
+
+  wlg-run.sh: |
+    #!/bin/sh
+
+    wlg_config=content/quickstarts/stress/stress-pod.yaml
+    k8s_config=${KUBECONFIG:-$HOME/.kube/config}
+    http_stress_ns=http-stress
+
+    ### Functions ##################################################################
+    fail() {
+      echo $@ >&2
+    }
+
+    warn() {
+      fail "$ProgramName: $@"
+    }
+
+    die() {
+      local err=$1
+      shift
+      fail "$ProgramName: $@"
+      exit $err
+    }
+
+    check_admin() {
+      local oc_whoami=`oc whoami`
+      local oc_admin_user=system:admin
+
+      test "$oc_whoami" = "$oc_admin_user"
+    }
+
+    oc_create_env() {
+      oc create -f- <<_ENV_EOF_
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: wlg-env
+      namespace: $http_stress_ns
+    data:
+      # which app to execute inside WLG pod
+      RUN: "${RUN:-mb}"
+      # benchmark run-time in seconds
+      LOAD_GENERATORS: "${LOAD_GENERATORS:-1}"
+      # benchmark run-time in seconds
+      RUN_TIME: "${RUN_TIME:-120}"
+      # maximum delay between client requests in ms
+      MB_DELAY: "${MB_DELAY:-0}"
+      # extended RE (egrep) to filter target routes
+      MB_TARGETS: "${MB_TARGETS:-.}"
+      # how many connections per target route
+      MB_CONNS_PER_TARGET: "${MB_CONNS_PER_TARGET:-1}"
+      # HTTP method (GET by default)
+      MB_METHOD: "${MB_METHOD:-GET}"
+      # body length of POST requests in characters
+      MB_REQUEST_BODY_SIZE: "${MB_REQUEST_BODY_SIZE:-1024}"
+      # how many HTTP keep-alive requests to send before sending "Connection: close".
+      MB_KA_REQUESTS: "${MB_KA_REQUESTS:-1}"
+      # use TLS session reuse [yn]
+      MB_TLS_SESSION_REUSE: "${MB_TLS_SESSION_REUSE:-true}"
+      # thread ramp-up time in seconds
+      MB_RAMP_UP: "${MB_RAMP_UP:-0}"
+      # target path for HTTP(S) requests
+      URL_PATH: "${URL_PATH:-/}"
+      # Endpoint for collecting results from workload generator node(s).  Keep empty if copying is not required.
+      # - scp://[user@]server:[path]
+      # - kcp://[namespace/]pod:[path]
+      SERVER_RESULTS: "${SERVER_RESULTS}"
+      # the kubeconfig file to use when talking to the cluster
+      KUBECONFIG: "/etc/kubernetes/k8s.conf"
+    _ENV_EOF_
+    }
+
+    oc_create() {
+      local wlg=1
+
+      oc new-project $http_stress_ns --skip-config-write
+      oc_create_env || \
+        die 1 "Cannot create environment ConfigMap for WLG pod(s)."
+      oc create cm wlg-targets --from-file=wlg-targets=./routes.txt -n=$http_stress_ns || \
+        die 1 "Cannot create wlg-targets ConfigMap for WLG pod(s)."
+      oc create secret generic wlg-ssh-key --from-file=wlg-ssh-key=$SERVER_RESULTS_SSH_KEY -n=$http_stress_ns || \
+        die 1 "Cannot create wlg-ssh-key Secret for WLG pod(s)."
+      oc create cm k8s-config --from-file=k8s-config=$k8s_config -n=$http_stress_ns || \
+        die 1 "Cannot create k8s-config ConfigMap for WLG pod(s)."
+
+      test "$LOAD_GENERATOR_NODES" && check_admin && {
+        # Lode generator nodes were specified and we have a cluster admin, steer the workload generator
+        NODE_SELECTOR='{"test": "wlg"}'
+      }
+
+      # create all the workload generators
+      while test $wlg -le ${LOAD_GENERATORS:-1}
+      do
+        oc process \
+          -pIDENTIFIER=$wlg \
+          -pHTTP_STRESS_CONTAINER_IMAGE="${HTTP_STRESS_CONTAINER_IMAGE}" \
+          -pNODE_SELECTOR="${NODE_SELECTOR:-null}" \
+          -f $wlg_config \
+          -n=$http_stress_ns | \
+            oc create -f- -n=$http_stress_ns &
+        sleep 0.1s
+        wlg=$(($wlg + 1))
+      done
+    }
+
+    oc_cleanup() {
+      exec 3>&1 4>&2 >/dev/null 2>&1
+      oc delete pods -n=$http_stress_ns --all
+      oc delete cm -n=$http_stress_ns --all      # wlg-targets! (e.g. switch from http->edge)
+      oc delete secret wlg-ssh-key -n=$http_stress_ns || true
+      oc delete ns $http_stress_ns || true
+      exec 2>&4 1>&3
+    }
+
+    client_wait_complete() {
+      local completed
+      while true; do
+        completed=$(oc get pods --no-headers -n=$http_stress_ns -l=app=http-stress --field-selector=status.phase=Succeeded 2>/dev/null | wc -l)
+        echo "Completed wlg pods: $completed/${LOAD_GENERATORS}"
+        test $completed -eq ${LOAD_GENERATORS} && break
+        sleep 10
+      done
+    }
+
+    oc_cleanup
+    oc_create
+    client_wait_complete
+    oc_cleanup
+
+  stress-pod.yaml: |
+    apiVersion: v1
+    kind: Template
+    metadata:
+      name: http-stress-template
+    objects:
+    - apiVersion: v1
+      kind: Pod
+      metadata:
+        generateName: http-stress-
+        labels:
+          app: http-stress
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - http-stress
+              topologyKey: kubernetes.io/hostname
+        containers:
+        - env:
+          - name: IDENTIFIER
+            value: ${IDENTIFIER}
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          envFrom:
+          - configMapRef:
+              name: wlg-env
+          image: ${HTTP_STRESS_CONTAINER_IMAGE}
+          imagePullPolicy: Always
+          name: http-stress
+          resources: {}
+          volumeMounts:
+          - mountPath: /etc/kubernetes/
+            name: k8s-config
+          - mountPath: /opt/wlg/
+            name: targets
+          - mountPath: /opt/stress/.ssh/
+            name: ssh-key
+        hostNetwork: false
+        nodeSelector: "${{NODE_SELECTOR}}"
+        restartPolicy: Never
+        securityContext:
+          sysctls:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
+    # "unsafe" sysctl
+    #      - name: net.ipv4.tcp_tw_reuse
+    #        value: "1"
+    #    serviceAccountName: stress
+        tolerations:
+        - effect: NoSchedule
+          key: test
+          operator: Equal
+          value: wlg
+        volumes:
+        - configMap:
+            items:
+            - key: k8s-config
+              path: k8s.conf
+            name: k8s-config
+            optional: true
+          name: k8s-config
+        - configMap:
+            items:
+            - key: wlg-targets
+              path: targets.txt
+            name: wlg-targets
+            optional: true
+          name: targets
+        - name: ssh-key
+          secret:
+            items:
+            - key: wlg-ssh-key
+              path: id_rsa
+            optional: true
+            secretName: wlg-ssh-key
+            defaultMode: 0400
+    parameters:
+    - description: Number to append to the name of resources
+      name: IDENTIFIER
+      value: '1'
+    - description: nodeSelector definition
+      name: NODE_SELECTOR
+      value: null
+    - description: HTTP workload generator image
+      name: HTTP_STRESS_CONTAINER_IMAGE
+      value: 'quay.io/openshift-scale/http-stress'
+
+  server-http.yaml: |
+    apiVersion: v1
+    kind: Template
+    metadata:
+      name: nginx
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        name: nginx-http-${IDENTIFIER}
+      spec:
+        replicas: 1
+        selector:
+          name: nginx-http-${IDENTIFIER}
+        template:
+          metadata:
+            labels:
+              name: nginx-http-${IDENTIFIER}
+              test: http
+          spec:
+            containers:
+            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+              imagePullPolicy: IfNotPresent
+              name: nginx-http
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              securityContext:
+                capabilities:
+                  drop:
+                  - KILL
+                  - MKNOD
+                  - SETGID
+                  - SETUID
+                  - SYS_CHROOT
+                privileged: false
+            restartPolicy: Always
+    - apiVersion: v1
+      kind: Route
+      metadata:
+        name: nginx-http-${IDENTIFIER}
+      spec:
+        host: ${APPLICATION_DOMAIN}
+        to:
+          kind: Service
+          name: nginx-http-${IDENTIFIER}
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        annotations:
+          description: Exposes and load balances the application pods
+        labels:
+          name: nginx-http
+        name: nginx-http-${IDENTIFIER}
+      spec:
+        ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+        selector:
+          name: nginx-http-${IDENTIFIER}
+        type: NodePort
+    parameters:
+    - description: The exposed hostname that will route to the nginx-* service, if left
+        blank a value will be defaulted.
+      displayName: Application Hostname
+      name: APPLICATION_DOMAIN
+      value: ''
+    - description: Number to append to the name of resources
+      name: IDENTIFIER
+      value: '1'
+    - description: HTTP server container image
+      name: HTTP_SERVER_CONTAINER_IMAGE
+      value: 'quay.io/openshift-scale/nginx'
+
+  server-tls-edge.yaml: |
+    apiVersion: v1
+    kind: Template
+    metadata:
+      name: nginx
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        name: nginx-edge-${IDENTIFIER}
+      spec:
+        replicas: 1
+        selector:
+          name: nginx-edge-${IDENTIFIER}
+        template:
+          metadata:
+            labels:
+              name: nginx-edge-${IDENTIFIER}
+              test: http
+          spec:
+            containers:
+            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+              imagePullPolicy: IfNotPresent
+              name: nginx-edge
+              ports:
+              - containerPort: 8080
+                name: http
+                protocol: TCP
+              - containerPort: 8443
+                name: https
+                protocol: TCP
+              securityContext:
+                capabilities:
+                  drop:
+                  - KILL
+                  - MKNOD
+                  - SETGID
+                  - SETUID
+                  - SYS_CHROOT
+                privileged: false
+            restartPolicy: Always
+    - apiVersion: v1
+      kind: Route
+      metadata:
+        name: nginx-edge-${IDENTIFIER}
+      spec:
+        host: ${APPLICATION_DOMAIN}
+        tls:
+          certificate: "-----BEGIN CERTIFICATE-----\nMIIDZTCCAk2gAwIBAgIBATANBgkqhkiG9w0BAQsFADBNMQswCQYDVQQGEwJVUzET\nMBEGA1UECAwKQ2FsaWZvcm5pYTELMAkGA1UEBwwCTlkxHDAaBgNVBAoME0RlZmF1\nbHQgQ29tcGFueSBMdGQwHhcNMTcwMTI0MDgzNDQwWhcNMjcwMTIyMDgzNDQwWjCB\njzErMCkGA1UEAwwiKi5yb3V0ZXIuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbDET\nMBEGA1UECAwKQ2FsaWZvcm5pYTELMAkGA1UEBhMCVVMxIDAeBgkqhkiG9w0BCQEW\nEWFkbWluQGV4YW1wbGUuY29tMRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRk\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyzR6sztDA59cN7lypc5j\nUgrpyQ+Kt2fiHMjNahNhs28n4k3owd9IP64x8NXYZw/C2+c2Jz27y9e+EvSRduNV\nopVOzepfP8wOJRrcXMQCEt8wQ4iCB+wPtj7KaaC3e6gq4UYSb/LxTHc0MUFfFT5i\n3cxQhltrR6SfCA+KcuclGtkRPySSgmlheHHFxbHdYMvop5G8V9f6wNl04IjKFxtl\n7NTL1Ia8NpAnIit0mxfxWNkYa9E+SrONjEAQt0Z8OBRAt94tq3ilFAmDEcm/aTEH\ns+b5zscNbf7Mh1NtzCHpeFd/tKBxNyMJlEMoCc4rFDv8pBveXXOlKp/MHt7q3ANs\naQIDAQABow0wCzAJBgNVHRMEAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQCIq+8T7wc8\njL6G9/VM21mlxbHmkPB18eCxMV0VZvKdH+Hg2g8U5flg+cE8kG/BBMPAdA+I2Lla\ngi1uqESEqKMyiJvqxej2IIxQKojUEPF/u0ZjAxc8pzs8yUtgDbt6Ur6sDJ2NShbg\nBnQVkOrFTJJ0trHMPc4zilIeLGZXiZNJrC/JBPOe0DbInSixIreoPSNciW6G5MZ3\ni4a8cpmg7WTzNSkikvkzaZA0xWupYwjbQdxg5qmflzA8e+45uVc8H+6qQ5em83+x\nRr7RN9p3GnxBK7sc7taCQxLwyWW0hsRqfvWvWzEsDj57WElvIe8ed8vk8AjBxg1S\ngnYUE1S6lSSH\n-----END CERTIFICATE-----"
+          key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLNHqzO0MDn1w3\nuXKlzmNSCunJD4q3Z+IcyM1qE2GzbyfiTejB30g/rjHw1dhnD8Lb5zYnPbvL174S\n9JF241WilU7N6l8/zA4lGtxcxAIS3zBDiIIH7A+2PsppoLd7qCrhRhJv8vFMdzQx\nQV8VPmLdzFCGW2tHpJ8ID4py5yUa2RE/JJKCaWF4ccXFsd1gy+inkbxX1/rA2XTg\niMoXG2Xs1MvUhrw2kCciK3SbF/FY2Rhr0T5Ks42MQBC3Rnw4FEC33i2reKUUCYMR\nyb9pMQez5vnOxw1t/syHU23MIel4V3+0oHE3IwmUQygJzisUO/ykG95dc6Uqn8we\n3urcA2xpAgMBAAECggEAJESUlcLA/jeGLQfzV3aTsYPzIAifGIb5C2wnhYQ6Dt2K\n/9Ap99hTO9JqZXK1cgeVHsyQlMZm60XxTc7K265NjXwamZP4NhnEeIjnxcLSH+4n\n3hXSJ3nRgBSK6fleZjqolJZ+Ge8BdEVeUmA5iUAeQzoBMUnFxv6xx62GZ2Wr8LN1\n4h+icGwJkL/zqS2oHpvMPhmevY7fcfO54G8DK1XBk+Pr/rYBzKEAIdgBIW2a52wZ\nLXNccCfV96mVhet43GzCIqnpj7cPnpQUs5RAgs/f6RsZAz5nwMnuQnCDz2pe2bJ3\nz2MyuiZvNz2iTftUURKzOdrH/ZjJpt8tI0pwUrMzkQKBgQDwZnIOif3s4D8B1tvC\ntteqALl0XyvpvLvmeztNa1K6C6hsbHIePDMBt/2StKtVMw+YRV0Cgpv2i0YiVxE6\nbHmYuUNa9UWuxiz1vTtdeT8JzR7N0LlhgPQpXdbeF/xd0nW8i9VFhBBgAVmtG/hn\n9dqb5tT9LFusm/GVV6o5EYccfQKBgQDYZCSupZIsBn4AEpzo3haWSQtunjnX9pYQ\nZRB6RyHK/L0bZJ9c5aoDzST/Tith7izDG/V49qM4NHCi8h8tyzfwNX5jaGy2Ot7/\nRqjc01T3VgzIHot+du4TO19Q9UwUskMqZgfFOMrj7c7Ec86Tug4HlfKZqQL6Ey6N\nkU9cK4nPXQKBgQCQ++gL1rNa+f9l95QAQc+diuROR9uvExFrtqSUU4bIB6HjCiBl\nFb9ZaQK4SNgQAUSFfEfU7LptHaAFs+cDCkrnjcwOfmAxQPn6ls7H2Ajpu1i5ngk/\nwcr/a8XbmjGsz/IL7XWJgFVz4TyZR4YwBLl8TuHjcq4zUrWHcSCLXIPU7QKBgEv+\nn4NWUodzoDyWTNTbakNNU959YwMdboZDeA35fTy0lhVQuUb+wT6khSHEaifyZXYA\nE61vsNLEV+ph7eE/RV3u63wt6D/3XOl5/0POVECoz8RYNdUsH2BRsZ/VBesez8fM\nHV5+G4MAuWT05s+qv9KaLqEYYhtBMVA2gBB2medhAoGAXd6lnBByuWrfHGWB5Gu+\ngKWz8b/b7CD64F10lQnv049qkFL7W4W3FuevaeEu59fUS5YlmoqLK9HA0PYtYu7O\nruEWqJwxkE3obUYLCv9gOnbmBTbW06n6sajBljbkQIqdI6SNKzO73N2scQi80jGi\n170/K2a6P2a38cg91lZDv9Q=\n-----END PRIVATE KEY-----"
+          termination: edge
+        to:
+          kind: Service
+          name: nginx-edge-${IDENTIFIER}
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        annotations:
+          description: Exposes and load balances the application pods
+        labels:
+          name: nginx-edge
+        name: nginx-edge-${IDENTIFIER}
+      spec:
+        ports:
+        - name: http
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+        selector:
+          name: nginx-edge-${IDENTIFIER}
+        type: NodePort
+    parameters:
+    - description: The exposed hostname that will route to the nginx-* service, if left
+        blank a value will be defaulted.
+      displayName: Application Hostname
+      name: APPLICATION_DOMAIN
+      value: ''
+    - description: Number to append to the name of resources
+      name: IDENTIFIER
+      value: '1'
+    - description: HTTP server container image
+      name: HTTP_SERVER_CONTAINER_IMAGE
+      value: 'quay.io/openshift-scale/nginx'
+
+  server-tls-passthrough.yaml: |
+    apiVersion: v1
+    kind: Template
+    metadata:
+      name: nginx
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        name: nginx-passthrough-${IDENTIFIER}
+      spec:
+        replicas: 1
+        selector:
+          name: nginx-passthrough-${IDENTIFIER}
+        template:
+          metadata:
+            labels:
+              name: nginx-passthrough-${IDENTIFIER}
+              test: http
+          spec:
+            containers:
+            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+              imagePullPolicy: IfNotPresent
+              name: nginx-passthrough
+              ports:
+              - containerPort: 8080
+                name: http
+                protocol: TCP
+              - containerPort: 8443
+                name: https
+                protocol: TCP
+              securityContext:
+                capabilities:
+                  drop:
+                  - KILL
+                  - MKNOD
+                  - SETGID
+                  - SETUID
+                  - SYS_CHROOT
+                privileged: false
+            restartPolicy: Always
+    - apiVersion: v1
+      kind: Route
+      metadata:
+        name: nginx-passthrough-${IDENTIFIER}
+      spec:
+        host: ${APPLICATION_DOMAIN}
+        tls:
+          termination: passthrough
+        to:
+          kind: Service
+          name: nginx-passthrough-${IDENTIFIER}
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        annotations:
+          description: Exposes and load balances the application pods
+        labels:
+          name: nginx-passthrough
+        name: nginx-passthrough-${IDENTIFIER}
+      spec:
+        ports:
+        - name: https
+          port: 8443
+          protocol: TCP
+          targetPort: 8443
+        selector:
+          name: nginx-passthrough-${IDENTIFIER}
+        type: NodePort
+    parameters:
+    - description: The exposed hostname that will route to the nginx-* service, if left
+        blank a value will be defaulted.
+      displayName: Application Hostname
+      name: APPLICATION_DOMAIN
+      value: ''
+    - description: Number to append to the name of resources
+      name: IDENTIFIER
+      value: '1'
+    - description: HTTP server container image
+      name: HTTP_SERVER_CONTAINER_IMAGE
+      value: 'quay.io/openshift-scale/nginx'
+
+  server-tls-reencrypt.yaml: |
+    apiVersion: v1
+    kind: Template
+    metadata:
+      name: nginx
+    objects:
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        name: nginx-reencrypt-${IDENTIFIER}
+      spec:
+        replicas: 1
+        selector:
+          name: nginx-reencrypt-${IDENTIFIER}
+        template:
+          metadata:
+            labels:
+              name: nginx-reencrypt-${IDENTIFIER}
+              test: http
+          spec:
+            containers:
+            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+              imagePullPolicy: IfNotPresent
+              name: nginx-reencrypt
+              ports:
+              - containerPort: 8080
+                name: http
+                protocol: TCP
+              - containerPort: 8443
+                name: https
+                protocol: TCP
+              securityContext:
+                capabilities:
+                  drop:
+                  - KILL
+                  - MKNOD
+                  - SETGID
+                  - SETUID
+                  - SYS_CHROOT
+                privileged: false
+            restartPolicy: Always
+    - apiVersion: v1
+      kind: Route
+      metadata:
+        name: nginx-reencrypt-${IDENTIFIER}
+      spec:
+        host: ${APPLICATION_DOMAIN}
+        tls:
+          certificate: "-----BEGIN CERTIFICATE-----\nMIIDZTCCAk2gAwIBAgIBATANBgkqhkiG9w0BAQsFADBNMQswCQYDVQQGEwJVUzET\nMBEGA1UECAwKQ2FsaWZvcm5pYTELMAkGA1UEBwwCTlkxHDAaBgNVBAoME0RlZmF1\nbHQgQ29tcGFueSBMdGQwHhcNMTcwMTI0MDgzNDQwWhcNMjcwMTIyMDgzNDQwWjCB\njzErMCkGA1UEAwwiKi5yb3V0ZXIuZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbDET\nMBEGA1UECAwKQ2FsaWZvcm5pYTELMAkGA1UEBhMCVVMxIDAeBgkqhkiG9w0BCQEW\nEWFkbWluQGV4YW1wbGUuY29tMRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRk\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyzR6sztDA59cN7lypc5j\nUgrpyQ+Kt2fiHMjNahNhs28n4k3owd9IP64x8NXYZw/C2+c2Jz27y9e+EvSRduNV\nopVOzepfP8wOJRrcXMQCEt8wQ4iCB+wPtj7KaaC3e6gq4UYSb/LxTHc0MUFfFT5i\n3cxQhltrR6SfCA+KcuclGtkRPySSgmlheHHFxbHdYMvop5G8V9f6wNl04IjKFxtl\n7NTL1Ia8NpAnIit0mxfxWNkYa9E+SrONjEAQt0Z8OBRAt94tq3ilFAmDEcm/aTEH\ns+b5zscNbf7Mh1NtzCHpeFd/tKBxNyMJlEMoCc4rFDv8pBveXXOlKp/MHt7q3ANs\naQIDAQABow0wCzAJBgNVHRMEAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQCIq+8T7wc8\njL6G9/VM21mlxbHmkPB18eCxMV0VZvKdH+Hg2g8U5flg+cE8kG/BBMPAdA+I2Lla\ngi1uqESEqKMyiJvqxej2IIxQKojUEPF/u0ZjAxc8pzs8yUtgDbt6Ur6sDJ2NShbg\nBnQVkOrFTJJ0trHMPc4zilIeLGZXiZNJrC/JBPOe0DbInSixIreoPSNciW6G5MZ3\ni4a8cpmg7WTzNSkikvkzaZA0xWupYwjbQdxg5qmflzA8e+45uVc8H+6qQ5em83+x\nRr7RN9p3GnxBK7sc7taCQxLwyWW0hsRqfvWvWzEsDj57WElvIe8ed8vk8AjBxg1S\ngnYUE1S6lSSH\n-----END CERTIFICATE-----"
+          key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLNHqzO0MDn1w3\nuXKlzmNSCunJD4q3Z+IcyM1qE2GzbyfiTejB30g/rjHw1dhnD8Lb5zYnPbvL174S\n9JF241WilU7N6l8/zA4lGtxcxAIS3zBDiIIH7A+2PsppoLd7qCrhRhJv8vFMdzQx\nQV8VPmLdzFCGW2tHpJ8ID4py5yUa2RE/JJKCaWF4ccXFsd1gy+inkbxX1/rA2XTg\niMoXG2Xs1MvUhrw2kCciK3SbF/FY2Rhr0T5Ks42MQBC3Rnw4FEC33i2reKUUCYMR\nyb9pMQez5vnOxw1t/syHU23MIel4V3+0oHE3IwmUQygJzisUO/ykG95dc6Uqn8we\n3urcA2xpAgMBAAECggEAJESUlcLA/jeGLQfzV3aTsYPzIAifGIb5C2wnhYQ6Dt2K\n/9Ap99hTO9JqZXK1cgeVHsyQlMZm60XxTc7K265NjXwamZP4NhnEeIjnxcLSH+4n\n3hXSJ3nRgBSK6fleZjqolJZ+Ge8BdEVeUmA5iUAeQzoBMUnFxv6xx62GZ2Wr8LN1\n4h+icGwJkL/zqS2oHpvMPhmevY7fcfO54G8DK1XBk+Pr/rYBzKEAIdgBIW2a52wZ\nLXNccCfV96mVhet43GzCIqnpj7cPnpQUs5RAgs/f6RsZAz5nwMnuQnCDz2pe2bJ3\nz2MyuiZvNz2iTftUURKzOdrH/ZjJpt8tI0pwUrMzkQKBgQDwZnIOif3s4D8B1tvC\ntteqALl0XyvpvLvmeztNa1K6C6hsbHIePDMBt/2StKtVMw+YRV0Cgpv2i0YiVxE6\nbHmYuUNa9UWuxiz1vTtdeT8JzR7N0LlhgPQpXdbeF/xd0nW8i9VFhBBgAVmtG/hn\n9dqb5tT9LFusm/GVV6o5EYccfQKBgQDYZCSupZIsBn4AEpzo3haWSQtunjnX9pYQ\nZRB6RyHK/L0bZJ9c5aoDzST/Tith7izDG/V49qM4NHCi8h8tyzfwNX5jaGy2Ot7/\nRqjc01T3VgzIHot+du4TO19Q9UwUskMqZgfFOMrj7c7Ec86Tug4HlfKZqQL6Ey6N\nkU9cK4nPXQKBgQCQ++gL1rNa+f9l95QAQc+diuROR9uvExFrtqSUU4bIB6HjCiBl\nFb9ZaQK4SNgQAUSFfEfU7LptHaAFs+cDCkrnjcwOfmAxQPn6ls7H2Ajpu1i5ngk/\nwcr/a8XbmjGsz/IL7XWJgFVz4TyZR4YwBLl8TuHjcq4zUrWHcSCLXIPU7QKBgEv+\nn4NWUodzoDyWTNTbakNNU959YwMdboZDeA35fTy0lhVQuUb+wT6khSHEaifyZXYA\nE61vsNLEV+ph7eE/RV3u63wt6D/3XOl5/0POVECoz8RYNdUsH2BRsZ/VBesez8fM\nHV5+G4MAuWT05s+qv9KaLqEYYhtBMVA2gBB2medhAoGAXd6lnBByuWrfHGWB5Gu+\ngKWz8b/b7CD64F10lQnv049qkFL7W4W3FuevaeEu59fUS5YlmoqLK9HA0PYtYu7O\nruEWqJwxkE3obUYLCv9gOnbmBTbW06n6sajBljbkQIqdI6SNKzO73N2scQi80jGi\n170/K2a6P2a38cg91lZDv9Q=\n-----END PRIVATE KEY-----"
+          destinationCACertificate: "-----BEGIN CERTIFICATE-----\nMIIDbTCCAlWgAwIBAgIJAJR/jN0Oa+/rMA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV\nBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMQswCQYDVQQHDAJOWTEcMBoGA1UE\nCgwTRGVmYXVsdCBDb21wYW55IEx0ZDAeFw0xNzAxMjQwODExMDJaFw0yNzAxMjIw\nODExMDJaME0xCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMQswCQYD\nVQQHDAJOWTEcMBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDCCASIwDQYJKoZI\nhvcNAQEBBQADggEPADCCAQoCggEBAMItGS9sSafyqBuOcQcQ5j7OQ0EwF9qOckhl\nfT8VzUbcOy8/L/w654MpLEa4O4Fiek3keE7SDWGVtGZWDvT9y1QUxPhkDWq1Y3rr\nyMelv1xRIyPVD7EEicga50flKe8CKd1U3D6iDQzq0uxZZ6I/VArXW/BZ4LfPauzN\n9EpCYyKq0fY7WRFIGouO9Wu800nxcHptzhLAgSpO97aaZ+V+jeM7n7fchRSNrpIR\nzPBl/lIBgCPJgkax0tcm4EIKIwlG+jXWc5mvV8sbT8rAv32HVuaP6NafyWXXP3H1\noBf2CQCcwuM0sM9ZeZ5JEDF/7x3eNtqSt1X9HjzVpQjiVBXY+E0CAwEAAaNQME4w\nHQYDVR0OBBYEFOXxMHAA1qaKWlP+gx8tKO2rQ81WMB8GA1UdIwQYMBaAFOXxMHAA\n1qaKWlP+gx8tKO2rQ81WMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB\nAJAri7Pd0eSY/rvIIvAvjhDPvKt6gI5hJEUp+M3nWTWA/IhQFYutb9kkZGhbBeLj\nqneJa6XYKaCcUx6/N6Vvr3AFqVsbbubbejRpdpXldJC33QkwaWtTumudejxSon24\nW/ANN/3ILNJVMouspLRGkFfOYp3lq0oKAlNZ5G3YKsG0znAfqhAVtqCTG9RU24Or\nxzkEaCw8IY5N4wbjCS9FPLm7zpzdg/M3A/f/vrIoGdns62hzjzcp0QVTiWku74M8\nv7/XlUYYvXOvPQCCHgVjnAZlnjcxMTBbwtdwfxjAmdNTmFFpASnf0s3b287zQwVd\nIeSydalVtLm7rBRZ59/2DYo=\n-----END CERTIFICATE-----"
+          termination: reencrypt
+        to:
+          kind: Service
+          name: nginx-reencrypt-${IDENTIFIER}
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        annotations:
+          description: Exposes and load balances the application pods
+        labels:
+          name: nginx-reencrypt
+        name: nginx-reencrypt-${IDENTIFIER}
+      spec:
+        ports:
+        - name: https
+          port: 8443
+          protocol: TCP
+          targetPort: 8443
+        selector:
+          name: nginx-reencrypt-${IDENTIFIER}
+        type: NodePort
+    parameters:
+    - description: The exposed hostname that will route to the nginx-* service, if left
+        blank a value will be defaulted.
+      displayName: Application Hostname
+      name: APPLICATION_DOMAIN
+      value: ''
+    - description: Number to append to the name of resources
+      name: IDENTIFIER
+      value: '1'
+    - description: HTTP server container image
+      name: HTTP_SERVER_CONTAINER_IMAGE
+      value: 'quay.io/openshift-scale/nginx'
