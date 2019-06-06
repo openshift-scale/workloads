@@ -5,6 +5,7 @@ metadata:
 data:
   run.sh: |
     #!/bin/sh
+    set -eo pipefail
     # pbench Configuration
     echo "$(date -u) Configuring pbench for Node Vertical"
     mkdir -p /var/lib/pbench-agent/tools-default/
