@@ -16,15 +16,15 @@ data:
       echo "" > /var/lib/pbench-agent/tools-default/mpstat
       echo "" > /var/lib/pbench-agent/tools-default/perf
       echo "" > /var/lib/pbench-agent/tools-default/pidstat
-      master_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/master= | grep master | awk '{print $1}'`
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
       for node in $master_nodes; do
         echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
       done
-      infra_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/infra= | grep infra | awk '{print $1}'`
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
       for node in $infra_nodes; do
         echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
       done
-      worker_nodes=`oc get nodes --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | awk '{print $1}'`
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
       for node in $worker_nodes; do
         echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
       done

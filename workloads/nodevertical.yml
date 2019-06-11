@@ -46,23 +46,23 @@
 
     - name: Label worker nodes with pbench agent for nodevertical
       shell: |
-        oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= | grep worker | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+        oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
       when: enable_pbench_agents|bool
 
     - name: Label worker nodes without pbench agent for nodevertical
       shell: |
-        oc get nodes -l node-role.kubernetes.io/worker= --show-labels | grep worker | grep -v "pbench_agent=true" | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+        oc get nodes -l node-role.kubernetes.io/worker= --show-labels --no-headers | grep -v "pbench_agent=true" | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
       when: enable_pbench_agents|bool
 
     - name: Label worker nodes when there are no pbench agents
       shell: |
-        oc get nodes | grep worker | head -n 4 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+        oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -n 4 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
       when: not enable_pbench_agents|bool
 
     - name: Calculate maximum pods to fit in nodevertical labeled space
       shell: |
         for node in $(oc get nodes -l="nodevertical=true" | awk 'NR > 1 {print $1}'); do
-          pods_running=$(oc describe node $node | grep -w "Non-terminated \Pods:" | awk  '{print $3}' | sed "s/(//g")
+          pods_running=$(oc describe node $node | grep -w "Non-terminated \Pods:" | awk '{print $3}' | sed "s/(//g")
           pod_count=$(( pod_count+pods_running ))
         done
         echo "$(( {{nodevertical_maxpods}}-pod_count ))"
