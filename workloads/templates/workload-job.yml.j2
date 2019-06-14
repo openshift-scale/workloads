@@ -22,7 +22,7 @@ spec:
               - key: nodevertical
                 operator: DoesNotExist
 {% endif %}
-{% if enable_pbench_agents %}
+{% if workload_job_privileged %}
       serviceAccountName: useroot
       hostNetwork: true
 {% endif %}
@@ -50,6 +50,17 @@ spec:
         - name: pbench-ssh
           mountPath: /root/.ssh/id_rsa.pub
           subPath: id_rsa.pub
+        - name: pbench-ssh
+          mountPath: /.ssh/authorized_keys
+          subPath: authorized_keys
+        - name: pbench-ssh
+          mountPath: /.ssh/id_rsa
+          subPath: id_rsa
+        - name: pbench-ssh
+          mountPath: /.ssh/id_rsa.pub
+          subPath: id_rsa.pub
+        - name: unprivileged-ssh
+          mountPath: /.ssh
         - name: pbench-ssh
           mountPath: /opt/pbench-agent/id_rsa
           subPath: id_rsa
@@ -83,6 +94,10 @@ spec:
         envFrom:
         - configMapRef:
             name: scale-ci-workload-http-env
+{% elif workload_job == "network" %}
+        envFrom:
+        - configMapRef:
+            name: scale-ci-workload-network-env
 {% endif %}
       volumes:
       - name: workload-script
@@ -99,7 +114,8 @@ spec:
         secret:
           secretName: pbench-ssh
           defaultMode: 0600
-
+      - name: unprivileged-ssh
+        emptyDir: {}
 {% if enable_pbench_agents %}
       - name: pbench-results
         hostPath:

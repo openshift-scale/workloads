@@ -1,0 +1,53 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# RHCOS network benchmarking workload variables.
+###############################################################################
+
+# Container image in use
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+# Use nodeselector to place workload job on specific node
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default('', true)|bool }}"
+# Tolerate taint on workload driver
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
+# Privileged job container
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(true, true)|bool }}"
+
+# Kubeconfig for tooling container script
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
+
+# Network benchmarks specific parameters:
+network_test_uperf_image: "{{ lookup('env', 'NETWORK_TEST_UPERF_IMAGE')|default('quay.io/openshift-scale/scale-ci-uperf', true) }}"
+network_test_uperf_sshd_port: "{{ lookup('env', 'NETWORK_TEST_UPERF_SSHD_PORT')|default(20000, true)|int }}"
+network_test_uperf_port_range: "{{ lookup('env', 'NETWORK_TEST_UPERF_PORT_RANGE')|default('20010 20109', true) }}"
+network_test_prefix: "{{ lookup('env', 'NETWORK_TEST_PREFIX')|default('network', true) }}"
+network_test_pairs: "{{ lookup('env', 'NETWORK_TEST_PAIRS')|default('1', true) }}"
+network_test_basename: "{{ lookup('env', 'NETWORK_TEST_BASENAME')|default('network', true) }}"
+# Host Network automatically makes the uperf pods privileged as it is a requirement of the test
+network_test_hostnetwork: "{{ lookup('env', 'NETWORK_TEST_HOSTNETWORK')|default(false, true)|bool|lower }}"
+network_test_service: "{{ lookup('env', 'NETWORK_TEST_SERVICE')|default(false, true)|bool|lower }}"
+network_test_type: "{{ lookup('env', 'NETWORK_TEST_TYPE')|default('stream,rr', true) }}"
+network_test_runtime: "{{ lookup('env', 'NETWORK_TEST_RUNTIME')|default(30, true)|int }}"
+network_test_message_sizes: "{{ lookup('env', 'NETWORK_TEST_MESSAGE_SIZES')|default('64,1024,16384', true) }}"
+network_test_protocol: "{{ lookup('env', 'NETWORK_TEST_PROTOCOL')|default('tcp,udp', true) }}"
+network_test_instances: "{{ lookup('env', 'NETWORK_TEST_INSTANCES')|default('1', true) }}"
+network_test_samples: "{{ lookup('env', 'NETWORK_TEST_SAMPLES')|default(3, true)|int }}"
+
+network_test_cleanup: "{{ lookup('env', 'NETWORK_TEST_CLEANUP')|default(true, true)|bool|lower }}"
