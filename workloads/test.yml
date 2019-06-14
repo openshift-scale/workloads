@@ -62,7 +62,7 @@
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |
-        oc get projects | grep "scale-ci-tooling"
+        oc get project scale-ci-tooling
       ignore_errors: true
       changed_when: false
       register: scale_ci_tooling_ns_exists

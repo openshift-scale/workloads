@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    # pbench Configuration
+    echo "$(date -u) Configuring pbench for Deployments per namespace cluster limits test"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for Deployments per ns cluster limits test"
+    # End pbench Configuration
+
+    # Start of Test Code
+    echo "$(date -u) Running Deployments per ns cluster limits test"
+    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/cluster-limits-deployments-per-namespace.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-copy-results --prefix {{deployments_per_ns_test_prefix}}
+    echo "$(date -u) Completed running Deployments per ns cluster limits test"
+    # End of Test Code
+  
+  cluster-limits-deployments-per-namespace.yaml: |
+    provider: local
+    ClusterLoader:
+      cleanup: {{deployments_per_ns_cleanup}}
+      projects:
+        - num: 1
+          basename: {{deployments_per_ns_basename}}
+          ifexists: delete
+          templates:
+            - num: {{deployments_per_ns_count}}
+              file: deployment-config-cluster-limits-deployments.yaml
+              parameters:
+                - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
+                - IMAGE: {{deployments_per_ns_pod_image}}
+  deployment-config-cluster-limits-deployments.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: deploymentConfigTemplate
+      creationTimestamp: 
+      annotations:
+        description: This template will create a deploymentConfig with 1 replica and 4
+          env vars
+        tags: ''
+    objects:
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: deploymentconfig${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: replicationcontroller${IDENTIFIER}
+          spec:
+            containers:
+            - name: dpns${IDENTIFIER}
+              image: "${IMAGE}"
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: ENVVAR1_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR2_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR3_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR4_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              resources: {}
+              imagePullPolicy: IfNotPresent
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 1
+        selector:
+          name: replicationcontroller${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    - name: IMAGE
+      description: Image to use for deploymentConfig
+      value: "gcr.io/google-containers/pause-amd64:3.0"
+      required: false
+    - name: ENV_VALUE
+      description: Value to use for environment variables
+      generate: expression
+      from: "[A-Za-z0-9]{255}"
+      required: false
+    labels:
+      template: deploymentConfigTemplate 

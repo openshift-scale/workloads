@@ -466,3 +466,52 @@ NETWORK_TEST_INSTANCES=1,2
 NETWORK_TEST_SAMPLES=3
 NETWORK_TEST_CLEANUP=true
 ```
+
+## Deployments per namespace cluster limits Workload
+
+The Deployments per namespace cluster limits workload playbook is `workloads/cluster-limits-deployments-per-ns.yml` and will run the Deployments per namespace cluster limits test on your RHCOS cluster.
+
+Running from CLI:
+
+```sh
+$ cp workloads/inventory.example inventory
+$ # Add orchestration host to inventory
+$ # Edit vars in workloads/vars/deployments-per-ns.yml or define Environment vars (See below)
+$ time ansible-playbook -vv -i inventory workloads/cluster-limits-deployments-per-ns.yml
+```
+
+### Environment variables for Deployments per namespace cluster limits workload playbook
+
+```
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+PUBLIC_KEY
+PRIVATE_KEY
+ORCHESTRATION_USER
+
+###############################################################################
+# RHCOS workload variables.
+###############################################################################
+WORKLOAD_IMAGE
+WORKLOAD_JOB_NODE_SELECTOR
+WORKLOAD_JOB_TAINT
+WORKLOAD_JOB_PRIVILEGED
+
+KUBECONFIG_FILE
+
+PBENCH_SSH_PRIVATE_KEY_FILE
+PBENCH_SSH_PUBLIC_KEY_FILE
+ENABLE_PBENCH_AGENTS
+PBENCH_SERVER
+
+SCALE_CI_RESULTS_TOKEN
+JOB_COMPLETION_POLL_ATTEMPTS
+
+# Deployments per namespace cluster limits workload specific parameters:
+DEPLOYMENTS_PER_NS_TEST_PREFIX
+DEPLOYMENTS_PER_NS_CLEANUP
+DEPLOYMENTS_PER_NS_BASENAME
+DEPLOYMENTS_PER_NS_COUNT
+DEPLOYMENTS_PER_NS_POD_IMAGE
+```
