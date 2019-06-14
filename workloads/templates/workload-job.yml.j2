@@ -22,6 +22,9 @@ spec:
               - key: nodevertical
                 operator: DoesNotExist
 {% endif %}
+{% if workload_job == "pvcscale" %}
+      serviceAccountName: useroot
+{% endif %}
 {% if workload_job_privileged %}
       serviceAccountName: useroot
       hostNetwork: true

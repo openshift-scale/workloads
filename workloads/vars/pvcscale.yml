@@ -1,0 +1,46 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# RHCOS pvcscale workload variables.
+###############################################################################
+
+# Container image in use
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+# Use nodeselector to place workload job on specific node
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default('', true)|bool }}"
+# Tolerate taint on workload driver
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
+# Privileged job container
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(true, true)|bool }}"
+
+# Kubeconfig for tooling container script
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
+
+# PVC scale workload specific parameters:
+pvcscale_test_prefix: "{{ lookup('env', 'PVCSCALE_TEST_PREFIX')|default('pvcscale', true) }}"
+pvcscale_cleanup: "{{ lookup('env', 'PVCSCALE_CLEANUP')|default(true, true)|bool|lower }}"
+pvcscale_basename: "{{ lookup('env', 'PVCSCALE_BASENAME')|default('pvcscale', true) }}"
+pvcscale_maxpods: "{{ lookup('env', 'PVCSCALE_MAXPODS')|default(10, true)|int }}"
+pvcscale_pod_image: "{{ lookup('env', 'PVCSCALE_POD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+pvcscale_stepsize: "{{ lookup('env', 'PVCSCALE_STEPSIZE')|default(1, true)|int }}"
+pvcscale_pause: "{{ lookup('env', 'PVCSCALE_PAUSE')|default(0, true)|int }}"
+pvcscale_storage_size: "{{ lookup('env', 'PVCSCALE_STORAGE_SIZE')|default('1Gi',true) }}"
+pvcscale_storageclass: "{{ lookup('env', 'PVCSCALE_STORAGECLASS')|default('csi-rbd', true) }}"
+access_modes: "{{ lookup('env', 'ACCESS_MODES')|default('ReadWriteOnce',true) }}"

@@ -1,0 +1,354 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    # pbench Configuration
+    echo "$(date -u) Configuring pbench for PVC scale test"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for PVC scale test"
+    # End pbench Configuration
+
+    # Test Configuration
+    echo "$(date -u) Running PVC scale test"
+    pbench-user-benchmark --config="{{ pvcscale_test_prefix }}-pods-{{ pvcscale_maxpods }}-sc-{{ pvcscale_storageclass }}-create_pods" -- 'VIPERCONFIG=/root/workload/pvcscale.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+
+    echo "$(date -u) Pods/PVC are crated ..."
+    # End Test Configuration
+    echo "Running pvc data collection"
+
+    # wait until all pods are started and then collect data
+    while [[ $(oc get pods -n {{ pvcscale_basename }}0 | grep pvc | grep Run |wc -l) -lt {{ pvcscale_maxpods }}  ]] ; do
+      sleep 30
+      echo "Waiting on pods to start..."
+    done
+    cp /root/workload/result.sh /tmp/
+    # todo: define how long to wait before stopping in case pods are not starting
+    pbench-user-benchmark --config="{{ pvcscale_test_prefix }}-pods-{{ pvcscale_maxpods }}-sc-{{ pvcscale_storageclass }}" -- /tmp/result.sh
+    pbench-copy-results --prefix "{{ pvcscale_test_prefix }}{{ pvcscale_maxpods }}{{ pvcscale_storageclass }}"
+    if [[ {{ pvcscale_cleanup }} == "true" ]]; then
+       oc delete project {{ pvcscale_basename }}0
+       while [ "$(oc get project |grep {{ pvcscale_basename }}0 | awk '{print $1}')" == {{ pvcscale_basename }}0 ]; do
+         echo "waiting on project {{ pvcscale_basename }}0 to disappear ..."
+         sleep 10
+       done
+       echo "Project {{ pvcscale_basename }}0 is deleted ... test finished"
+    elif [[ {{ pvcscale_cleanup }} == "false" ]]; then
+       echo "Test is done, but project {{ pvcscale_basename }}0 is not be deleted due to PVCSCALE_CLAENUP=false"
+    fi
+  result.sh: |
+    #!/bin/bash
+    cp /root/.kube/config /tmp/config
+    export KUBECONFIG=/tmp/config
+    oc create rolebinding pvcrolepvscale --clusterrole=view --serviceaccount=scale-ci-tooling:useroot --namespace={{ pvcscale_basename }}0
+    KUBEHOST=$(oc cluster-info | head -1 | cut -d'/' -f3 | cut -d':' -f1)
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    oc login --token=$TOKEN https://$KUBEHOST:6443 --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+    python /root/workload/check_pvpods.py --host $KUBEHOST --port 6443 --to $TOKEN -n {{ pvcscale_basename }}0 --check_pods --resdir "${benchmark_results_dir}"/pvcscaletest
+    cat "${benchmark_results_dir}"/pvcscaletest/pods_ready{{ pvcscale_basename }}0.csv  | cut -d',' -f9 | cut -d'T' -f2|cut -d'Z' -f1 >> "${benchmark_results_dir}"/pvcscaletest/pvcpod.csv
+    oc login -u system:admin 
+    oc delete sa useroot -n scale-ci-tooling
+  check_pvpods.py: |
+    #!/usr/bin/python
+    import sys
+    import argparse
+    import requests
+    import csv
+    import json
+    import time
+    import os
+
+    from requests.packages.urllib3.exceptions import InsecureRequestWarning
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    from requests.exceptions import ConnectionError
+
+    parser = argparse.ArgumentParser(description='Check pods/pv/pvc on OCP installation')
+    parser.add_argument("-proto", "--protocol", type=str,
+                    help='Protocol openshift (Default : https)',
+                    default="https")
+    parser.add_argument("-api", "--base_api", type=str,
+                    help='Url api and version (Default : /api/v1)',
+                    default="/api/v1")
+    parser.add_argument("-H", "--host", type=str,
+                    help='Host openshift (Default : 127.0.0.1)',
+                    default="127.0.0.1")
+    parser.add_argument("-P", "--port", type=str,
+                    help='Port openshift (Default : 8443)',
+                    default=8443)
+    parser.add_argument("-to", "--token", type=str,
+                    help='File with token openshift (like -t)')
+    parser.add_argument("--check_pods", action='store_true',
+                    help='Get information about pods')
+    parser.add_argument("-ns", help="The namespace where to look for parameters")
+    parser.add_argument("--check_pvc", action='store_true', help='Get list of PVCs elemements in desired namespace')
+    parser.add_argument("--resdir", help="result dir", type=str)
+
+    args = parser.parse_args()
+    ns = args.ns
+    resdir = args.resdir
+
+    class Openshift(object):
+      def __init__(self,
+                 proto='https',
+                 host='127.0.0.1',
+                 port=8443,
+                 token=None,
+                 debug=False,
+                 verbose=False,
+                 namespace=ns,
+                 base_api='/api/v1'):
+
+        self.proto = proto
+        self.host = host
+        self.port = port
+        self.debug = debug
+        self.verbose = verbose
+        self.namespace = namespace
+        self.base_api = base_api.rstrip('/')
+        self.resdir = str(resdir)
+        if token:
+            self.token = token
+        if resdir:
+            self.resdir=resdir
+
+        try:
+            if not os.path.exists(self.resdir):
+              os.mkdir(self.resdir)
+        except OSError:
+            print ("Directory creation:", self.resdir, "failed")
+        else:
+            print ("Directory:", self.resdir, "created succesfully")
+
+      def get_json(self, url):
+        headers = {"Authorization": 'Bearer %s' % self.token}
+        try:
+            r = requests.get('https://%s:%s%s' % (self.host, self.port, url),
+                             headers=headers,
+                             verify=False)
+            parsed_json = r.json()
+        except ValueError:
+            print ("Unable to authenticate against OCP master", self.host, "check is token correct")
+            sys.exit()
+        except ConnectionError as e:
+            print ("Unable to connect to OCP master", self.host, "check connection to master")
+            sys.exit()
+
+        return parsed_json
+
+    # get all PVC from particular namespace
+      def get_pvc(self, namespace=None):
+        if namespace:
+          self.namespace = ns
+        api_pvc = '%s/namespaces/%s/persistentvolumeclaims' % (self.base_api, self.namespace)
+        parsed_json = self.get_json(api_pvc)
+        pvc_claims = []
+
+        for item in parsed_json["items"]:
+            pvc_claims.append(item)
+            pvc_claims = sorted(pvc_claims, key=lambda k: k['metadata']['creationTimestamp'],reverse=False)
+
+            with open(self.resdir+"/""pvc_"+str(ns)+".json", "w") as allpvc:
+                json.dump(pvc_claims, allpvc, indent=4)
+
+        # sorted - get stuff properly printed
+
+        with open(self.resdir+"/""pvc_"+str(ns)+".csv", 'wb') as cvsout:
+            csv_out = csv.writer(cvsout)
+            csv_out.writerow(['PVC Name', 'PVC Size' 'PVC Create Time','PVC Create Time - TZ' 'PVC Namespace'])
+            for pvc in pvc_claims:
+                csv_out.writerow([pvc["metadata"]["name"], pvc['spec']['resources']['requests']['storage'],
+                                  int(time.mktime(time.strptime(pvc["metadata"]["creationTimestamp"], '%Y-%m-%dT%H:%M:%SZ'))),
+                                  pvc["metadata"]["creationTimestamp"],
+                                  pvc["metadata"]["namespace"]])
+
+      def get_pods(self, namespace=None):
+
+        if namespace:
+            self.namespace = ns
+
+        api_pods = '%s/namespaces/%s/pods' % (self.base_api, self.namespace)
+        parsed_json = self.get_json(api_pods)
+        pods = []
+
+        # sort pods based on creationTime
+        for item in parsed_json["items"]:
+            pods.append(item)
+            pods = sorted(pods, key=lambda k: k["status"]["containerStatuses"][0]["state"]["running"]["startedAt"],reverse=False)
+            with open(self.resdir+"/""pods_"+str(ns)+".json", "w") as allpods:
+                json.dump(pods, allpods, indent=4)
+
+        with open(self.resdir+"/""pods_"+str(ns)+".csv", 'wb') as csv_pods:
+            csv_out = csv.writer(csv_pods,delimiter=",")
+            csv_out.writerow(['Pod Name', "Pod Create Time", "Pod Create Time - TZ",
+                              "Pod StartTime", "Pod StartTime - TZ", "Pod StartedAt Time",
+                              "Pod StartedAt Time - TZ",
+                              "Pod Namespace", "PVC Name"])
+            # todo - fix issue where this part fail if *all* pods are not ready - ie. there is not valid state
+            for pod in pods:
+                csv_out.writerow([pod["metadata"]["name"], int(time.mktime(time.strptime(pod["metadata"]["creationTimestamp"], '%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["metadata"]["creationTimestamp"],
+                                  int(time.mktime(time.strptime(pod["status"]["startTime"],'%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["status"]["startTime"],
+                                  int(time.mktime(time.strptime(pod["status"]["containerStatuses"][0]["state"]["running"]["startedAt"],'%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["status"]["containerStatuses"][0]["state"]["running"]["startedAt"],
+                                  pod["metadata"]["namespace"], pod["spec"]["volumes"][0]["persistentVolumeClaim"]["claimName"]])
+
+    # we have to also get state when pods were in "Ready" status
+      def pod_read(self, namespace=None):
+        if namespace:
+            self.namespace = ns
+        api_pods = '%s/namespaces/%s/pods' % (self.base_api, self.namespace)
+        parsed_json = self.get_json(api_pods)
+        pods = []
+
+        # sort pods on time when they were first time "Ready"
+        for item in parsed_json["items"]:
+            pods.append(item)
+            pods = sorted(pods, key=lambda k: k["status"]["conditions"][1]["lastTransitionTime"], reverse=False)
+            with open(self.resdir+"/""pods_" + str(ns) + ".json", "w") as startpod:
+                json.dump(pods,startpod, indent=4)
+
+
+            with open(self.resdir+"/""pods_ready" + str(ns) + ".csv", "wb") as pods_ready:
+                pods_ready_out = csv.writer(pods_ready, delimiter=",")
+                pods_ready_out.writerow(['Pod Name', "Pod Create Time", "Pod Create Time - TZ",
+                              "Pod StartTime", "Pod StartTime - TZ", "Pod StartedAt Time",
+                              "Pod StartedAt Time - TZ", "Pod Ready-TZ",
+                              "Pod-Ready", "Pod Namespace", "PVC Name"])
+
+
+                for pod in pods:
+                    pods_ready_out.writerow([pod["metadata"]["name"], int(time.mktime(time.strptime(pod["metadata"]["creationTimestamp"], '%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["metadata"]["creationTimestamp"],
+                                  int(time.mktime(time.strptime(pod["status"]["startTime"],'%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["status"]["startTime"],
+                                  int(time.mktime(time.strptime(pod["status"]["containerStatuses"][0]["state"]["running"]["startedAt"], '%Y-%m-%dT%H:%M:%SZ'))),
+                                  pod["status"]["containerStatuses"][0]["state"]["running"]["startedAt"],
+                          int(time.mktime(time.strptime(pod["status"]["conditions"][1]["lastTransitionTime"], '%Y-%m-%dT%H:%M:%SZ'))),
+                          pod["status"]["conditions"][1]["lastTransitionTime"],
+                                  pod["metadata"]["namespace"], pod["spec"]["volumes"][0]["persistentVolumeClaim"]["claimName"]])
+
+    if __name__ == "__main__":
+      if not args.token:
+        parser.print_help()
+        sys.exit()
+
+      myos = Openshift(host=args.host,
+                     port=args.port,
+                     token=args.token,
+                     proto=args.protocol,
+                     base_api=args.base_api)
+
+      if args.check_pvc:
+        myos.get_pvc()
+
+      if args.check_pods:
+        myos.get_pods()
+        myos.pod_read()
+        myos.get_pvc()
+
+  pvcscale.yml: |
+    provider: local
+    ClusterLoader:
+      cleanup: {{ pvcscale_cleanup }}
+      projects:
+        - num: 1
+          basename: {{ pvcscale_basename }}
+          tuning: default
+          ifexists: delete
+          templates:
+            - num: {{ pvcscale_maxpods }}
+              basename: pvcscale
+              file: pvcscaletemplate.yaml
+      tuningsets:
+        - name: default
+          pods:
+            stepping:
+              stepsize: {{ pvcscale_stepsize }}
+              pause: {{ pvcscale_pause }}
+            ratelimit:
+                delay: 0
+  pvcscaletemplate.yaml: |
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: pvcscale-test
+      labels:
+        name: pvcscale-test
+      annotations:
+        descriptions: PVC scale test - start pods and mount PVC from StorageClass
+        tags: pvc, pvc-test
+    objects:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "${PVC_NAME}"
+        annotations:
+          volume.beta.kubernetes.io/storage-class: {{ pvcscale_storageclass }}
+      spec:
+        accessModes:
+         - {{ access_modes }}
+        resources:
+          requests:
+            storage: {{ pvcscale_storage_size }}
+    - kind: Pod
+      apiVersion: v1
+      metadata:
+        generateName: pvc-pod-
+        labels:
+          name: pvc-pod-${IDENTIFIER}
+      spec:
+        containers:
+        - image: {{ pvcscale_pod_image }}
+          imagePullPolicy: IfNotPresent
+          name: fio-pod
+          ports: []
+          volumeMounts:
+          - name: persistentvolume
+            mountPath: "/mnt/pvcmount"
+          securityContext:
+            apabilities: {}
+            privileged: false
+            seLinuxOptions:
+              level: s0:c9,c4
+          terminationMessagePath: "/dev/termination-log"
+        restartPolicy: Never
+        volumes:
+        - name: persistentvolume
+          persistentVolumeClaim:
+            claimName: "${PVC_NAME}"
+    parameters:
+    - name: PVC_NAME
+      description: PVC name
+      required: true
+      from: pvc[a-z0-9]{10}
+      generate: expression
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
