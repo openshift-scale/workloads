@@ -14,7 +14,7 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
 
 # Use nodeselector to place workload job on specific node
-workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default('', true)|bool }}"
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(true, true)|bool }}"
 # Tolerate taint on workload driver
 workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
 # Privileged job container
