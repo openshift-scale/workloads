@@ -6,6 +6,7 @@ data:
   run.sh: |
     #!/bin/bash
     set -e
+    log() { echo "$(date -u) $@" >&2; }
     # pbench Configuration
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
@@ -34,76 +35,87 @@ data:
     # End pbench Configuration
 
     # Test Configuration
-    echo "$(date -u) Configuring HTTP test"
+    log "Configuring HTTP test"
     test_dir=/tmp/http-ci-tests
-    export HOME=$test_dir
     mkdir -p $test_dir/content/quickstarts/{nginx,stress}
     install -m 644 /root/workload/server-*.yaml $test_dir/content/quickstarts/nginx
     install -m 644 /root/workload/stress-*.yaml $test_dir/content/quickstarts/stress
     install -m 755 /root/workload/*.sh $test_dir
-    #SERVER_RESULTS=${SERVER_RESULTS:-scp://root@${OCP_NODE_NAME}:/var/lib/pbench-agent}
-    SERVER_RESULTS=${SERVER_RESULTS:-kcp://scale-ci-tooling/${OCP_POD_NAME}:/var/lib/pbench-agent}
+    set -a
+    HOME=$test_dir			# When running unprivileged, make sure we can write to our HOME
+    KUBECONFIG=/root/.kube/config	# Hard-coded kubeconfig by workload-job.yml.j2
+    PBENCH_USE=true			# Always use pbench as a wrapper to move results to a pbench server
+    PBENCH_SCRAPER_USE=false		# Do not use pbench scraper for r2r analysis
+    PBENCH_CLEAR_RESULTS=true		# Clear results from previous pbench runs
+    PBENCH_MOVE_RESULTS=true		# Move the benchmark results to a pbench server
+    HTTP_TEST_SERVER_RESULTS=${HTTP_TEST_SERVER_RESULTS:-kcp://scale-ci-tooling/${OCP_POD_NAME}:/var/lib/pbench-agent}
+    set +a
     # End Test Configuration
 
     # Start of Test Code
-    echo "$(date -u) Running HTTP test"
+    log "Running HTTP test"
     cd $test_dir
-    ./http-test.sh all
-    echo "$(date -u) Completed HTTP test"
+    ./http-test.sh all || { log "HTTP test failed, sleep(ing) inf, please debug"; sleep inf; }
+    log "Completed HTTP test"
     # End of Test Code
 
   env.sh: |
-    # Test configuration: a label to append to pbench directories and mb result directories.
-    export TEST_CFG=${TEST_CFG:-1router}
+    set -a
     # A list of paths to k8s configuration files.  Colon-delimited for Linux.
-    export KUBECONFIG=${KUBECONFIG:-/root/.kube/config}
+    KUBECONFIG=${KUBECONFIG:-/root/.kube/config}
     # Use benchmarking and performance analysis framework Pbench.
-    export PBENCH_USE=${PBENCH_USE:-false}
+    PBENCH_USE=${PBENCH_USE:-false}
     # Pbench scraper/wedge usage for r2r analysis.
-    export PBENCH_SCRAPER_USE=${PBENCH_SCRAPER_USE:-false}
+    PBENCH_SCRAPER_USE=${PBENCH_SCRAPER_USE:-false}
     # Clear results from previous pbench runs.
-    export CLEAR_RESULTS=${CLEAR_RESULTS:-true}
+    PBENCH_CLEAR_RESULTS=${PBENCH_CLEAR_RESULTS:-true}
     # Move the benchmark results to a pbench server.
-    export MOVE_RESULTS=${MOVE_RESULTS:-false}
+    PBENCH_MOVE_RESULTS=${PBENCH_MOVE_RESULTS:-false}
+
     # HTTP-test specifics
+    # Test configuration: a label to append to pbench directories and mb result directories.
+    HTTP_TEST_SUFFIX=${HTTP_TEST_SUFFIX:-1router}
     # Endpoint for collecting results from workload generator node(s).  Keep empty if copying is not required.
     # - scp://[user@]server:[path]
     # - kcp://[namespace/]pod:[path]
     # Note: when PBENCH_USE=true, path is overriden by benchmark_run_dir environment variable
-    export SERVER_RESULTS=${SERVER_RESULTS}
-    # Path to private key when using scp:// to copy results to SERVER_RESULTS.  It is mounted to workload generator container(s).
-    export SERVER_RESULTS_SSH_KEY=${SERVER_RESULTS_SSH_KEY:-/root/.ssh/id_rsa}
+    HTTP_TEST_SERVER_RESULTS=${HTTP_TEST_SERVER_RESULTS}
+    # Path to private key when using scp:// to copy results to HTTP_TEST_SERVER_RESULTS.  It is mounted to workload generator container(s).
+    HTTP_TEST_SERVER_RESULTS_SSH_KEY=${HTTP_TEST_SERVER_RESULTS_SSH_KEY:-/root/.ssh/id_rsa}
     # How many workload generators to use.
-    export LOAD_GENERATORS=${LOAD_GENERATORS:-1}
+    HTTP_TEST_LOAD_GENERATORS=${HTTP_TEST_LOAD_GENERATORS:-1}
     # Load-generator nodes described by an extended regular expression (use "oc get nodes" node names).
     # If unset/empty, do not pin the workload generators to any nodes.
-    export LOAD_GENERATOR_NODES=${LOAD_GENERATOR_NODES:-}
-    # Number of projects to create for each type of application (4 types currently).
-    export CL_PROJECTS=${CL_PROJECTS:-10}
-    # Number of templates to create per project.
-    export CL_TEMPLATES=${CL_TEMPLATES:-1}
+    HTTP_TEST_LOAD_GENERATOR_NODES=${HTTP_TEST_LOAD_GENERATOR_NODES}
+    # Number of projects to create per each type of application template (4 templates currently).
+    HTTP_TEST_APP_PROJECTS=${HTTP_TEST_APP_PROJECTS:-10}
+    # Number of application templates to process per project.
+    HTTP_TEST_APP_TEMPLATES=${HTTP_TEST_APP_TEMPLATES:-1}
     # Run time of individual HTTP test iterations in seconds.
-    export RUN_TIME=${RUN_TIME:-120}
-    # Maximum delay between client requests in ms.
-    export MB_DELAY=${MB_DELAY:-0}
+    HTTP_TEST_RUNTIME=${HTTP_TEST_RUNTIME:-120}
+    # Thread ramp-up time in seconds.  Must be < HTTP_TEST_RUNTIME.
+    HTTP_TEST_MB_RAMP_UP=${HTTP_TEST_MB_RAMP_UP:-0}
+    # Maximum delay between client requests in ms.  Can be a list of numbers separated by commas.
+    HTTP_TEST_MB_DELAY=${HTTP_TEST_MB_DELAY:-0}
     # Use TLS session reuse.
-    export MB_TLS_SESSION_REUSE=${MB_TLS_SESSION_REUSE:-true}
+    HTTP_TEST_MB_TLS_SESSION_REUSE=${HTTP_TEST_MB_TLS_SESSION_REUSE:-true}
     # HTTP method to use for backend servers (GET/POST).
-    export MB_METHOD=${MB_METHOD:-GET}
+    HTTP_TEST_MB_METHOD=${HTTP_TEST_MB_METHOD:-GET}
     # Backend server (200 OK) response document length.
-    export MB_RESPONSE_SIZE=${MB_RESPONSE_SIZE:-1024}
+    HTTP_TEST_MB_RESPONSE_SIZE=${HTTP_TEST_MB_RESPONSE_SIZE:-1024}
     # Body length of POST requests in characters for backend servers.
-    export MB_REQUEST_BODY_SIZE=${MB_REQUEST_BODY_SIZE:-1024}
+    HTTP_TEST_MB_REQUEST_BODY_SIZE=${HTTP_TEST_MB_REQUEST_BODY_SIZE:-1024}
     # Perform the test for the following (comma-separated) route terminations: mix,http,edge,passthrough,reencrypt
-    export ROUTE_TERMINATION=${ROUTE_TERMINATION:-mix}
-    # Run only a single HTTP test to establish functionality.  It also overrides CL_PROJECTS and CL_TEMPLATES.
-    export SMOKE_TEST=${SMOKE_TEST:-false}
+    HTTP_TEST_ROUTE_TERMINATION=${HTTP_TEST_ROUTE_TERMINATION:-mix}
+    # Run only a single HTTP test to establish functionality.  It also overrides HTTP_TEST_APP_PROJECTS and HTTP_TEST_APP_TEMPLATES.
+    HTTP_TEST_SMOKE_TEST=${HTTP_TEST_SMOKE_TEST:-false}
     # Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
-    export NAMESPACE_CLEANUP=${NAMESPACE_CLEANUP:-true}
+    HTTP_TEST_NAMESPACE_CLEANUP=${HTTP_TEST_NAMESPACE_CLEANUP:-true}
     # HTTP workload generator container image
-    export HTTP_STRESS_CONTAINER_IMAGE=${HTTP_STRESS_CONTAINER_IMAGE:-quay.io/openshift-scale/http-stress}
+    HTTP_TEST_STRESS_CONTAINER_IMAGE=${HTTP_TEST_STRESS_CONTAINER_IMAGE:-quay.io/openshift-scale/http-stress}
     # HTTP server container image
-    export HTTP_SERVER_CONTAINER_IMAGE=${HTTP_SERVER_CONTAINER_IMAGE:-quay.io/openshift-scale/nginx}
+    HTTP_TEST_SERVER_CONTAINER_IMAGE=${HTTP_TEST_SERVER_CONTAINER_IMAGE:-quay.io/openshift-scale/nginx}
+    set +a
 
   http-test.sh: |
     #!/bin/bash
@@ -129,11 +141,6 @@ data:
 
     # mb-specific variables ########################################################
     routes_file=routes.txt		# a file with routes to pass to cluster loader
-    : ${RUN_TIME:=120}		# benchmark run-time in seconds
-    : ${MB_TLS_SESSION_REUSE:=true}	# use TLS session reuse [yn]
-    : ${MB_METHOD:=GET}		# HTTP method to use for backend servers (GET/POST)
-    : ${MB_RESPONSE_SIZE:=1024}	# backend server (200 OK) response document length
-    : ${MB_REQUEST_BODY_SIZE:=1024}	# body length of POST requests in characters for backend servers
 
     ### Functions ##################################################################
     fail() {
@@ -168,7 +175,7 @@ data:
 
       for key in "${param_name[@]}" ; do
         hlp="${param_hlp[$i]}"
-        ((i++))
+        i=$((i+1))
         cat <<_HLP2_ 1>&2
      $key: $hlp
     _HLP2_
@@ -187,7 +194,7 @@ data:
         param_name[$i]="$param"
         param_fn[$i]="$fn"
         param_hlp[$i]="$hlp"
-        ((i++))
+        i=$((i+1))
       done << _PARAM_
     environment-dump|environment_dump|Dump the environment for the purposes of re-running some of the test iterations manually.
     router_liveness_probe-disable|router_liveness_probe|Increase period seconds for the router liveness probe.
@@ -214,7 +221,7 @@ data:
           echo "$fn"
           return 0
         fi
-        ((i++))
+        i=$((i+1))
       done
 
       return 1
@@ -245,7 +252,7 @@ data:
 
       check_admin || {
         echo "Not changing liveness probe, cluster admin needed."
-        return
+        return 0
       }
 
       # Increase period seconds for the router liveness probe.
@@ -253,12 +260,12 @@ data:
       do
         for selector in router=router app=router ingress.openshift.io/clusteringress=default ingresscontroller.operator.openshift.io/owning-ingresscontroller=default
         do
-          for d in $(oc get $deployment --selector=$selector --template='{{range .items}}{{.metadata.name}}|{{.metadata.namespace}}{{"\n"}}{{end }}' --all-namespaces)
+          for d in $(oc get $deployment --selector=$selector --template='{{range .items}}{{.metadata.name}}|{{.metadata.namespace}}{{"\n"}}{{end}}' --all-namespaces)
           do
             set -- ${d//|/ }
             d_name=$1
             d_namespace=$2
-            oc set probe $deployment/$d_name --liveness --period-seconds=$RUN_TIME -n=$d_namespace
+            oc set probe $deployment/$d_name --liveness --period-seconds=$HTTP_TEST_RUNTIME -n=$d_namespace
             # Alternatively, delete the router liveness probe.
             #oc set probe $deployment/$d_name --liveness --remove -n=$d_namespace
             probe_set=true
@@ -270,21 +277,21 @@ data:
     }
 
     load_generator_nodes_get() {
-      oc get nodes --no-headers | awk '{print $1}' | grep -E "${LOAD_GENERATOR_NODES}"
+      oc get nodes --no-headers | awk '{print $1}' | grep -E "${HTTP_TEST_LOAD_GENERATOR_NODES}"
     }
 
     results_dir_get() {
       local pbench_agent_dir=/var/lib/pbench-agent
-      local server_results_dir=$(echo ${SERVER_RESULTS:6} | cut -d: -f2-)
+      local server_results_dir=$(echo ${HTTP_TEST_SERVER_RESULTS:6} | cut -d: -f2-)
 
       # scp://user@server:
       test -z "$server_results_dir" && server_results_dir=$HOME
       # scp://user@server   (invalid spec, colon is required!)
-      test "$server_results_dir" = "${SERVER_RESULTS:6}" && server_results_dir=$pbench_agent_dir
+      test "$server_results_dir" = "${HTTP_TEST_SERVER_RESULTS:6}" && server_results_dir=$pbench_agent_dir
       test "${PBENCH_USE}" = true && server_results_dir=$pbench_agent_dir
 
       echo $server_results_dir
-      return
+      return 0
     }
 
     load_generator_nodes_label_taint() {
@@ -292,14 +299,14 @@ data:
       local i node placement taint region region_old
       local oc_whoami=`oc whoami`
 
-      test "$LOAD_GENERATOR_NODES" || {
+      test "$HTTP_TEST_LOAD_GENERATOR_NODES" || {
         echo "Not (un)labelling nodes, load generator nodes unspecified."
-        return
+        return 0
       }
 
       check_admin || {
         echo "Not (un)labelling nodes, cluster admin needed."
-        return
+        return 0
       }
 
       if test "$label" = y ; then
@@ -322,8 +329,8 @@ data:
         fi
         oc label node $node $placement --overwrite
         oc label node $node $region --overwrite
-        oc adm taint nodes $node $taint
-        ((i++))
+        oc adm taint nodes $node $taint --overwrite
+        i=$((i+1))
       done
     }
 
@@ -339,9 +346,9 @@ data:
 
     # Clear results from previous pbench runs.
     pbench_clear_results() {
-      test "${PBENCH_USE}" = true || return
+      test "${PBENCH_USE}" = true || return 0
 
-      if test "${CLEAR_RESULTS}" = "true" ; then
+      if test "${PBENCH_CLEAR_RESULTS}" = "true" ; then
         pbench-clear-results
       fi
     }
@@ -365,8 +372,6 @@ data:
 
       if oc get project $project >/dev/null 2>&1 ; then
         # $project exists, recycle it
-        # switch to the new project if we do not have access to the current project, note that `oc project` returns 0 when no project has been set!
-        test $(oc project -q 2>/dev/null | wc -l) -eq 1 || oc project $project
         for res in rc dc bc pod service route ; do
           oc delete $res --all -n=$project >/dev/null 2>&1
         done
@@ -380,14 +385,14 @@ data:
     cl_load() {
       local server_quickstart_dir="content/quickstarts/$http_server"
       local templates="$server_quickstart_dir/server-http.yaml $server_quickstart_dir/server-tls-edge.yaml $server_quickstart_dir/server-tls-passthrough.yaml $server_quickstart_dir/server-tls-reencrypt.yaml"
-      local projects=${CL_PROJECTS:-10}		# 10, 30, 60, 180
+      local projects=${HTTP_TEST_APP_PROJECTS:-10}		# 10, 30, 60, 180
       local project_start=1
-      local templates_total=${CL_TEMPLATES:-50}	# number of templates per project
+      local templates_total=${HTTP_TEST_APP_TEMPLATES:-50}	# number of templates per project
       local templates_start=1			# do not change or read the code to make sure it does what you want
 
       local project project_basename template p p_f i i_f
 
-      test "${SMOKE_TEST}" = true && {
+      test "${HTTP_TEST_SMOKE_TEST}" = true && {
         # override the number of projects and templates if this is just a smoke test
         projects=2
         templates_total=2
@@ -408,7 +413,7 @@ data:
             i_f=$(printf "%03d" $i)
             oc process \
               -pIDENTIFIER=$i_f \
-              -pHTTP_SERVER_CONTAINER_IMAGE=$HTTP_SERVER_CONTAINER_IMAGE \
+              -pHTTP_TEST_SERVER_CONTAINER_IMAGE=$HTTP_TEST_SERVER_CONTAINER_IMAGE \
               -f $template \
               -n=$project | oc create -f- -n=$project
             i=$((i+1))
@@ -422,7 +427,6 @@ data:
     pbench_user_benchmark() {
       local benchmark_test_config="$1"
 
-      echo "Starting Pbench on `hostname`"
       # a regular pbench run
       if test "${PBENCH_SCRAPER_USE}" = true ; then
         pbench-user-benchmark \
@@ -445,13 +449,16 @@ data:
 
       rm -f $run_log
 
-      test "${LOAD_GENERATORS}" -ge 1 || die 1 "workload generator count (${LOAD_GENERATORS}) is not >= 1"
+      test "${HTTP_TEST_LOAD_GENERATORS}" -ge 1 || die 1 "workload generator count (${HTTP_TEST_LOAD_GENERATORS}) is not >= 1"
 
-      test "${MB_TLS_SESSION_REUSE}" = true && mb_tls_session_reuse=y
+      test "${HTTP_TEST_MB_TLS_SESSION_REUSE}" = true && mb_tls_session_reuse=y
+
+      # Interface HTTP_TEST_STRESS_CONTAINER_IMAGE with the current environment
+      export MB_DELAY MB_TARGETS MB_CONNS_PER_TARGET MB_KA_REQUESTS URL_PATH
 
       # All possible route terminations are: mix,http,edge,passthrough,reencrypt
       # For the purposes of CI, use "mix" only
-      for route_term in ${ROUTE_TERMINATION//,/ } ; do
+      for route_term in ${HTTP_TEST_ROUTE_TERMINATION//,/ } ; do
         case $route_term in
           mix) mb_targets="(http|edge|passthrough|reencrypt)-0.1[.] (http|edge|passthrough|reencrypt)-0.[0-9][.]"	# don't use "\.", issues with yaml files
           ;;
@@ -482,7 +489,7 @@ data:
           }
           routes_f=$(printf "%04d" $routes)
 
-          for MB_DELAY in 0 ; do
+          for MB_DELAY in ${HTTP_TEST_MB_DELAY//,/ } ; do
             delay_f=$(printf "%04d" $MB_DELAY)
 
             # make sure you set 'net.ipv4.ip_local_port_range = 1024 65535' on the client machine
@@ -503,37 +510,35 @@ data:
               for MB_KA_REQUESTS in 1 10 100 ; do
                 ka_f=$(printf "%03d" $MB_KA_REQUESTS)
 
-                for URL_PATH in /${MB_RESPONSE_SIZE}.html ; do
+                for URL_PATH in /${HTTP_TEST_MB_RESPONSE_SIZE}.html ; do
                   now=$(date '+%Y-%m-%d_%H.%M.%S')
-                  benchmark_test_config="${routes_f}r-${conns_per_thread_f}cpt-${delay_f}d_ms-${ka_f}ka-${mb_tls_session_reuse}tlsru-${RUN_TIME}s-${route_term}-${TEST_CFG}"
+                  benchmark_test_config="${routes_f}r-${conns_per_thread_f}cpt-${delay_f}d_ms-${ka_f}ka-${mb_tls_session_reuse}tlsru-${HTTP_TEST_RUNTIME}s-${route_term}-${HTTP_TEST_SUFFIX}"
                   echo "Running test with config: $benchmark_test_config"
-
-                  export RUN_TIME MB_DELAY MB_TARGETS MB_CONNS_PER_TARGET MB_METHOD MB_REQUEST_BODY_SIZE MB_KA_REQUESTS MB_TLS_SESSION_REUSE URL_PATH LOAD_GENERATORS
 
                   if test "$PBENCH_USE" = true ; then
                     pbench_user_benchmark "$benchmark_test_config" || die $? "Test iteration with Pbench failed with exit code: $?"
                   else
                     # a test run without Pbench
-                    test "$SERVER_RESULTS" && {
-                      local server_results=$(echo ${SERVER_RESULTS:6} | cut -d: -f1)
-                      local server_results_dir=$(echo ${SERVER_RESULTS:6} | cut -d: -f2-)
+                    test "$HTTP_TEST_SERVER_RESULTS" && {
+                      local server_results=$(echo ${HTTP_TEST_SERVER_RESULTS:6} | cut -d: -f1)
+                      local server_results_dir=$(echo ${HTTP_TEST_SERVER_RESULTS:6} | cut -d: -f2-)
                       local abs_path_prefix
 
                       test "${server_results_dir}" && abs_path_prefix=/
-                      SERVER_RESULTS="${SERVER_RESULTS:0:6}${server_results}:${server_results_dir%/}${abs_path_prefix}$benchmark_test_config"
+                      HTTP_TEST_SERVER_RESULTS="${HTTP_TEST_SERVER_RESULTS:0:6}${server_results}:${server_results_dir%/}${abs_path_prefix}$benchmark_test_config"
                     }
 
     		$wlg_run 2>&1 || die $? "Test iteration failed with exit code: $?"
                   fi
 
                   ret=$?
-                  test "$SMOKE_TEST" = true -o -e "$file_quit" && return $ret
+                  test "$HTTP_TEST_SMOKE_TEST" = true -o -e "$file_quit" && return $ret
                   echo "sleeping $benchmark_iteration_sleep"
                   sleep $benchmark_iteration_sleep
                 done
               done
             done
-          done
+          done	# HTTP_TEST_MB_DELAY
         done
       done # route_term
     }
@@ -543,15 +548,15 @@ data:
       local dir routes_f conns_per_thread_f delay_f ka_f tlsru_f run_time_f route_term
       local total_hits total_rps total_latency_95 target_dir
       local now=$(date '+%Y-%m-%d_%H.%M.%S')
-      local archive_name=http-$now-${TEST_CFG}
+      local archive_name=http-$now-${HTTP_TEST_SUFFIX}
       local results_dir=$(results_dir_get)
       local out_dir=$results_dir/$archive_name
 
-      test "${SERVER_RESULTS}" || return
+      test "${HTTP_TEST_SERVER_RESULTS}" || return 0
 
       rm -rf $out_dir
       for dir in $(find $results_dir -maxdepth 1 -type d -name *[0-9]r-*[0-9]cpt-*[0-9]d_ms-*[0-9]ka-ytlsru-*s-* | LC_COLLATE=C sort) ; do
-        set $(echo $dir | sed -E 's|^.*([0-9]{1,})r-([0-9]{1,})cpt-([0-9]{1,})d_ms-([0-9]{1,})ka-([yn])tlsru-([0-9]{1,})s-([^-]*)-.*$|\1 \2 \3 \4 \5 \6 \7|')
+        set $(echo $dir | sed -E 's|^.*[^0-9]([0-9]{1,})r-([0-9]{1,})cpt-([0-9]{1,})d_ms-([0-9]{1,})ka-([yn])tlsru-([0-9]{1,})s-([^-]*)-.*$|\1 \2 \3 \4 \5 \6 \7|')
         routes_f=$1
         conns_per_thread_f=$2
         delay_f=$3
@@ -585,16 +590,17 @@ data:
     pbench_move_results() {
       local now=$(date '+%Y-%m-%d_%H.%M.%S')
 
-      test "${PBENCH_USE}" = true || return
+      test "${PBENCH_USE}" = true || return 0
 
-      if test "${MOVE_RESULTS}" = true ; then
-        pbench-move-results --prefix="http-$now-${TEST_CFG}" 2>&1
+      if test "${PBENCH_MOVE_RESULTS}" = true ; then
+        echo "Starting pbench-move-results on `hostname` to `pbench-move-results --show-server`"
+        pbench-move-results --prefix="http-$now-${HTTP_TEST_SUFFIX}" 2>&1
       fi
     }
 
     # Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
     namespace_cleanup() {
-      test "${NAMESPACE_CLEANUP}" = true || return
+      test "${HTTP_TEST_NAMESPACE_CLEANUP}" = true || return 0
 
       # a user might not have the privileges to do selector-based namespace deletion, go through his/her projects and
       # do a project-name cleanup
@@ -608,8 +614,8 @@ data:
 
       for key in "${param_fn[@]}" ; do
         fn="${param_fn[$i]}"
-        $fn
-        ((i++))
+        $fn || die 1 "failed to run $fn"
+        i=$((i+1))
       done
     }
 
@@ -630,15 +636,17 @@ data:
       shift
     done
 
+    test "$1" || usage 1	# no parameters passed
+
     # parameter/task processing
     while test "$1" ; do
       param="$1"
       fn=$(param2fn $param)
 
       if test $? -eq 0 ; then
-        $fn
+        $fn || die 1 "failed to run $fn"
       elif test "$param" = "all" ; then
-        main
+        main || die 1 "failed to run $fn"
       else
         die 1 "don't know what to do with parameter '$param'"
       fi
@@ -646,34 +654,15 @@ data:
       shift
     done
 
-    test "$param" || usage 1	# no parameters passed
-
   wlg-run-pbench.sh: |
     #!/bin/sh
 
     # This is a wrapper script for pbench.
 
     main() {
-      # Show the configuration for the HTTP load generator
-      cat <<EOF
-    RUN=$RUN
-    LOAD_GENERATORS=$LOAD_GENERATORS
-    RUN_TIME=$RUN_TIME
-    MB_DELAY=$MB_DELAY
-    MB_TARGETS=$MB_TARGETS
-    MB_CONNS_PER_TARGET=$MB_CONNS_PER_TARGET
-    MB_METHOD=$MB_METHOD
-    MB_REQUEST_BODY_SIZE=$MB_REQUEST_BODY_SIZE
-    MB_KA_REQUESTS=$MB_KA_REQUESTS
-    MB_TLS_SESSION_REUSE=$MB_TLS_SESSION_REUSE
-    MB_RAMP_UP=$MB_RAMP_UP
-    URL_PATH=$URL_PATH
-    SERVER_RESULTS=$SERVER_RESULTS
-    EOF
-
-      test "$SERVER_RESULTS" && {
-        local server_results=$(echo ${SERVER_RESULTS:6} | cut -d: -f1)
-        SERVER_RESULTS="${SERVER_RESULTS:0:6}${server_results}:$benchmark_run_dir"
+      test "$HTTP_TEST_SERVER_RESULTS" && {
+        local server_results=$(echo ${HTTP_TEST_SERVER_RESULTS:6} | cut -d: -f1)
+        HTTP_TEST_SERVER_RESULTS="${HTTP_TEST_SERVER_RESULTS:0:6}${server_results}:$benchmark_run_dir"
       }
 
       ./wlg-run.sh
@@ -722,9 +711,9 @@ data:
       # which app to execute inside WLG pod
       RUN: "${RUN:-mb}"
       # benchmark run-time in seconds
-      LOAD_GENERATORS: "${LOAD_GENERATORS:-1}"
+      LOAD_GENERATORS: "${HTTP_TEST_LOAD_GENERATORS:-1}"
       # benchmark run-time in seconds
-      RUN_TIME: "${RUN_TIME:-120}"
+      RUN_TIME: "${HTTP_TEST_RUNTIME:-120}"
       # maximum delay between client requests in ms
       MB_DELAY: "${MB_DELAY:-0}"
       # extended RE (egrep) to filter target routes
@@ -732,21 +721,21 @@ data:
       # how many connections per target route
       MB_CONNS_PER_TARGET: "${MB_CONNS_PER_TARGET:-1}"
       # HTTP method (GET by default)
-      MB_METHOD: "${MB_METHOD:-GET}"
+      MB_METHOD: "${HTTP_TEST_MB_METHOD:-GET}"
       # body length of POST requests in characters
-      MB_REQUEST_BODY_SIZE: "${MB_REQUEST_BODY_SIZE:-1024}"
+      MB_REQUEST_BODY_SIZE: "${HTTP_TEST_MB_REQUEST_BODY_SIZE:-1024}"
       # how many HTTP keep-alive requests to send before sending "Connection: close".
       MB_KA_REQUESTS: "${MB_KA_REQUESTS:-1}"
       # use TLS session reuse [yn]
-      MB_TLS_SESSION_REUSE: "${MB_TLS_SESSION_REUSE:-true}"
+      MB_TLS_SESSION_REUSE: "${HTTP_TEST_MB_TLS_SESSION_REUSE:-true}"
       # thread ramp-up time in seconds
-      MB_RAMP_UP: "${MB_RAMP_UP:-0}"
+      MB_RAMP_UP: "${HTTP_TEST_MB_RAMP_UP:-0}"
       # target path for HTTP(S) requests
       URL_PATH: "${URL_PATH:-/}"
       # Endpoint for collecting results from workload generator node(s).  Keep empty if copying is not required.
       # - scp://[user@]server:[path]
       # - kcp://[namespace/]pod:[path]
-      SERVER_RESULTS: "${SERVER_RESULTS}"
+      SERVER_RESULTS: "${HTTP_TEST_SERVER_RESULTS}"
       # the kubeconfig file to use when talking to the cluster
       KUBECONFIG: "/etc/kubernetes/k8s.conf"
     _ENV_EOF_
@@ -758,24 +747,25 @@ data:
       oc new-project $http_stress_ns --skip-config-write
       oc_create_env || \
         die 1 "Cannot create environment ConfigMap for WLG pod(s)."
+      oc get cm wlg-env --template '{{printf "%s\n" .data}}' -n=$http_stress_ns	# Print some debugging information for the WLG pod
       oc create cm wlg-targets --from-file=wlg-targets=./routes.txt -n=$http_stress_ns || \
         die 1 "Cannot create wlg-targets ConfigMap for WLG pod(s)."
-      oc create secret generic wlg-ssh-key --from-file=wlg-ssh-key=$SERVER_RESULTS_SSH_KEY -n=$http_stress_ns || \
+      oc create secret generic wlg-ssh-key --from-file=wlg-ssh-key=$HTTP_TEST_SERVER_RESULTS_SSH_KEY -n=$http_stress_ns || \
         die 1 "Cannot create wlg-ssh-key Secret for WLG pod(s)."
       oc create cm k8s-config --from-file=k8s-config=$k8s_config -n=$http_stress_ns || \
         die 1 "Cannot create k8s-config ConfigMap for WLG pod(s)."
 
-      test "$LOAD_GENERATOR_NODES" && check_admin && {
-        # Lode generator nodes were specified and we have a cluster admin, steer the workload generator
+      test "$HTTP_TEST_LOAD_GENERATOR_NODES" && check_admin && {
+        # Load generator nodes were specified and we have a cluster admin, steer the workload generator
         NODE_SELECTOR='{"test": "wlg"}'
       }
 
       # create all the workload generators
-      while test $wlg -le ${LOAD_GENERATORS:-1}
+      while test $wlg -le ${HTTP_TEST_LOAD_GENERATORS:-1}
       do
         oc process \
           -pIDENTIFIER=$wlg \
-          -pHTTP_STRESS_CONTAINER_IMAGE="${HTTP_STRESS_CONTAINER_IMAGE}" \
+          -pHTTP_TEST_STRESS_CONTAINER_IMAGE="${HTTP_TEST_STRESS_CONTAINER_IMAGE}" \
           -pNODE_SELECTOR="${NODE_SELECTOR:-null}" \
           -f $wlg_config \
           -n=$http_stress_ns | \
@@ -798,8 +788,8 @@ data:
       local completed
       while true; do
         completed=$(oc get pods --no-headers -n=$http_stress_ns -l=app=http-stress --field-selector=status.phase=Succeeded 2>/dev/null | wc -l)
-        echo "Completed wlg pods: $completed/${LOAD_GENERATORS}"
-        test $completed -eq ${LOAD_GENERATORS} && break
+        echo "Completed wlg pods: $completed/${HTTP_TEST_LOAD_GENERATORS}"
+        test $completed -eq ${HTTP_TEST_LOAD_GENERATORS} && break
         sleep 10
       done
     }
@@ -843,7 +833,7 @@ data:
           envFrom:
           - configMapRef:
               name: wlg-env
-          image: ${HTTP_STRESS_CONTAINER_IMAGE}
+          image: ${HTTP_TEST_STRESS_CONTAINER_IMAGE}
           imagePullPolicy: Always
           name: http-stress
           resources: {}
@@ -901,7 +891,7 @@ data:
       name: NODE_SELECTOR
       value: null
     - description: HTTP workload generator image
-      name: HTTP_STRESS_CONTAINER_IMAGE
+      name: HTTP_TEST_STRESS_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/http-stress'
 
   server-http.yaml: |
@@ -925,7 +915,7 @@ data:
               test: http
           spec:
             containers:
-            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+            - image: ${HTTP_TEST_SERVER_CONTAINER_IMAGE}
               imagePullPolicy: IfNotPresent
               name: nginx-http
               ports:
@@ -977,7 +967,7 @@ data:
       name: IDENTIFIER
       value: '1'
     - description: HTTP server container image
-      name: HTTP_SERVER_CONTAINER_IMAGE
+      name: HTTP_TEST_SERVER_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/nginx'
 
   server-tls-edge.yaml: |
@@ -1001,7 +991,7 @@ data:
               test: http
           spec:
             containers:
-            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+            - image: ${HTTP_TEST_SERVER_CONTAINER_IMAGE}
               imagePullPolicy: IfNotPresent
               name: nginx-edge
               ports:
@@ -1061,7 +1051,7 @@ data:
       name: IDENTIFIER
       value: '1'
     - description: HTTP server container image
-      name: HTTP_SERVER_CONTAINER_IMAGE
+      name: HTTP_TEST_SERVER_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/nginx'
 
   server-tls-passthrough.yaml: |
@@ -1085,7 +1075,7 @@ data:
               test: http
           spec:
             containers:
-            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+            - image: ${HTTP_TEST_SERVER_CONTAINER_IMAGE}
               imagePullPolicy: IfNotPresent
               name: nginx-passthrough
               ports:
@@ -1143,7 +1133,7 @@ data:
       name: IDENTIFIER
       value: '1'
     - description: HTTP server container image
-      name: HTTP_SERVER_CONTAINER_IMAGE
+      name: HTTP_TEST_SERVER_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/nginx'
 
   server-tls-reencrypt.yaml: |
@@ -1167,7 +1157,7 @@ data:
               test: http
           spec:
             containers:
-            - image: ${HTTP_SERVER_CONTAINER_IMAGE}
+            - image: ${HTTP_TEST_SERVER_CONTAINER_IMAGE}
               imagePullPolicy: IfNotPresent
               name: nginx-reencrypt
               ports:
@@ -1228,5 +1218,5 @@ data:
       name: IDENTIFIER
       value: '1'
     - description: HTTP server container image
-      name: HTTP_SERVER_CONTAINER_IMAGE
+      name: HTTP_TEST_SERVER_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/nginx'

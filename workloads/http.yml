@@ -11,9 +11,7 @@
     - vars/http.yml
   vars:
     workload_job: "http"
-    workload_job_privileged: false
-    workload_job_node_selector: false
-    workload_job_taint: false
+    workload_job_privileged: "{{enable_pbench_agents}}"
   tasks:
     - name: Create scale-ci-tooling directory
       file:
