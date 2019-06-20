@@ -40,13 +40,6 @@ spec:
           subPath: id_rsa.pub
         - name: pbench-agent-infra-tools
           mountPath: /var/lib/pbench-agent/tools-default
-
-        - name: proc-mount
-          mountPath: /proc_host
-        - name: admin-keys
-          mountPath: /etc/origin/master
-        - name: certs
-          mountPath: /etc/pki
         - name: ocp-volumes
           mountPath: /var/lib/kubelet/pods
         ports:
@@ -62,16 +55,6 @@ spec:
       - name: pbench-agent-infra-tools
         configMap:
           name: pbench-agent-infra-tools
-
-      - name: proc-mount
-        hostPath:
-          path: /proc
-      - name: admin-keys
-        hostPath:
-          path: /etc/origin/master
-      - name: certs
-        hostPath:
-          path: /etc/pki
       - name: ocp-volumes
         hostPath:
           path: /var/lib/kubelet/pods
