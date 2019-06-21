@@ -64,120 +64,109 @@ Default: There is no public default.
 Future use for pbench and prometheus scraper to place results into git repo that holds results data.
 
 ### JOB_COMPLETION_POLL_ATTEMPTS
-Default: `360`  
+Default: `1000`  
 Number of retries for Ansible to poll if the workload job has completed. Poll attempts delay 10s between polls with some additional time taken for each polling action depending on the orchestration host setup.
 
-### TEST_CFG
+### HTTP_TEST_SUFFIX
 Default: `1router`  
 A label to append to pbench directories and mb result directories.
 
-### PBENCH_USE
-Default: `false`  
-Use benchmarking and performance analysis framework pbench.
-
-### PBENCH_SCRAPER_USE
-Default: `false`  
-Pbench scraper/wedge usage for r2r analysis.
-
-### CLEAR_RESULTS
-Default: `true`  
-Clear results from previous pbench runs.
-
-### MOVE_RESULTS
-Default: `false`  
-Move the benchmark results to a pbench server.
-
-### SERVER_RESULTS
-Default: No Default  
-Endpoint for collecting results from workload generator node(s). Keep empty if copying is not required.
-
-### SERVER_RESULTS_SSH_KEY
-Default: `/root/.ssh/id_rsa`  
-Path to private key when using scp:// to copy results to SERVER_RESULTS. It is mounted to workload generator container(s).
-
-### LOAD_GENERATORS
+### HTTP_TEST_LOAD_GENERATORS
 Default: `1`  
 How many workload generators to use.
 
-### LOAD_GENERATOR_NODES
-Default: No Default  
+### HTTP_TEST_LOAD_GENERATOR_NODES
+Default: *empty*  
 Load-generator nodes described by an extended regular expression (use "oc get nodes" node names). If unset/empty, do not pin the workload generators to any nodes.
 
-### CL_PROJECTS
+### HTTP_TEST_APP_PROJECTS
 Default: `10`  
 Number of projects to create for each type of application (4 types currently).
 
-### CL_TEMPLATES
+### HTTP_TEST_APP_TEMPLATES
 Default: `1`  
 Number of templates to create per project.
 
-### RUN_TIME
+### HTTP_TEST_RUNTIME
 Default: `120`  
 Run time of individual HTTP test iterations in seconds.
 
-### MB_DELAY
+### HTTP_TEST_MB_RAMP_UP
 Default: `0`  
-Maximum delay between client requests in ms.
+Thread ramp-up time in seconds. Must be < HTTP_TEST_RUNTIME.
 
-### MB_TLS_SESSION_REUSE
+### HTTP_TEST_MB_DELAY
+Default: `0`  
+Maximum delay between client requests in ms. Can be a list of numbers separated by commas.
+
+### HTTP_TEST_MB_TLS_SESSION_REUSE
 Default: `true`  
 Use TLS session reuse.
 
-### MB_METHOD
+### HTTP_TEST_MB_METHOD
 Default: `GET`  
 HTTP method to use for backend servers (GET/POST).
 
-### MB_RESPONSE_SIZE
+### HTTP_TEST_MB_RESPONSE_SIZE
 Default: `1024`  
 Backend server (200 OK) response document length.
 
-### MB_REQUEST_BODY_SIZE
+### HTTP_TEST_MB_REQUEST_BODY_SIZE
 Default: `1024`  
 Body length of POST requests in characters for backend servers.
 
-### ROUTE_TERMINATION
+### HTTP_TEST_ROUTE_TERMINATION
 Default: `mix`  
 Perform the test for the following (comma-separated) route terminations: mix,http,edge,passthrough,reencrypt.
 
-### SMOKE_TEST
+### HTTP_TEST_SMOKE_TEST
 Default: `false`  
-Run only a single HTTP test to establish functionality. It also overrides CL_PROJECTS and CL_TEMPLATES.
+Run only a single HTTP test to establish functionality. It also overrides HTTP_TEST_APP_PROJECTS and HTTP_TEST_APP_TEMPLATES.
 
-### NAMESPACE_CLEANUP
+### HTTP_TEST_NAMESPACE_CLEANUP
 Default: `true`  
 Delete all namespaces with application pods, services and routes created for the purposes of HTTP tests.
 
-### HTTP_STRESS_CONTAINER_IMAGE
+### HTTP_TEST_STRESS_CONTAINER_IMAGE
 Default: `quay.io/openshift-scale/http-stress`  
 HTTP workload generator container image.
 
-### HTTP_SERVER_CONTAINER_IMAGE
+### HTTP_TEST_SERVER_CONTAINER_IMAGE
 Default: `quay.io/openshift-scale/nginx`  
 HTTP server container image.
 
-## Smoke test variables
+
+## Suggested configurations
+
+### Smoke test
+
+HTTP smoke test is the shortest-running HTTP test that establishes test's basic functionality and the ability of the framework to upload results to the pbench results server.
 
 ```
-TEST_CFG=1router_smoke
-PBENCH_USE=false
-PBENCH_SCRAPER_USE=false
-CLEAR_RESULTS=true
-MOVE_RESULTS=true
-# SERVER_RESULTS
-SERVER_RESULTS_SSH_KEY="/root/.ssh/id_rsa"
-LOAD_GENERATORS=1
-# LOAD_GENERATOR_NODES
-CL_PROJECTS=2
-CL_TEMPLATES=1
-RUN_TIME=120
-MB_DELAY=0
-MB_TLS_SESSION_REUSE=true
-MB_METHOD=GET
-MB_RESPONSE_SIZE=1024
-MB_REQUEST_BODY_SIZE=1024
-ROUTE_TERMINATION=mix
-SMOKE_TEST=true
-NAMESPACE_CLEANUP=true
-HTTP_STRESS_CONTAINER_IMAGE="quay.io/openshift-scale/http-stress"
-HTTP_SERVER_CONTAINER_IMAGE="quay.io/openshift-scale/nginx"
+PBENCH_SERVER=pbench.example.com # set to your own pbench server
+ENABLE_PBENCH_AGENTS=false
+HTTP_TEST_SMOKE_TEST=true
+```
+
+## Small-scale
+
+A suggested configuration for running HTTP tests on a small-scale cluster with 4 worker nodes, each with 4 vCPUs, 16GB RAM. This configuration is used for documenting OpenShift's "Baseline router performance".
+
+```
+PBENCH_SERVER=pbench.example.com # set to your own pbench results server
+ENABLE_PBENCH_AGENTS=true
+#HTTP_TEST_LOAD_GENERATOR_NODES= # set when you have cluster administrator privileges
+HTTP_TEST_APP_TEMPLATES=10
+HTTP_TEST_ROUTE_TERMINATION=http,edge,passthrough,reencrypt
+```
+
+## Large-scale
+
+A suggested configuration for running HTTP tests on a larger-scale cluster with 10+ worker nodes, each with 4 vCPUs, 16GB RAM. This configuration is used for router regression testing between OpenShift releases.
+
+```
+PBENCH_SERVER=pbench.example.com # set to your own pbench results server
+ENABLE_PBENCH_AGENTS=true
+#HTTP_TEST_LOAD_GENERATOR_NODES= # set when you have cluster administrator privileges
+HTTP_TEST_APP_TEMPLATES=50
 ```
