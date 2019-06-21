@@ -225,9 +225,10 @@ data:
     metadata:
       name: uperf
     priority:
-    allowPrivilegedContainer: ${NETWORK_TEST_HOSTNETWORK}
+    allowPrivilegedContainer: false
     defaultAddCapabilities:
     allowedCapabilities:
+    - "AUDIT_WRITE"
     allowHostDirVolumePlugin: false
     allowHostNetwork: ${NETWORK_TEST_HOSTNETWORK}
     allowHostPorts: false
@@ -282,8 +283,7 @@ data:
               env:
               - name: UPERF_SSH_PORT
                 value: "${UPERF_SSHD_PORT}"
-              securityContext:
-                privileged: false
+              securityContext: {}
               volumeMounts:
               - name: pbench-ssh
                 mountPath: /.ssh/authorized_keys
@@ -369,7 +369,8 @@ data:
               - name: UPERF_SSH_PORT
                 value: "${UPERF_SSHD_PORT}"
               securityContext:
-                privileged: true
+                capabilities:
+                  add: ["AUDIT_WRITE"]
               volumeMounts:
               - name: pbench-ssh
                 mountPath: /.ssh/authorized_keys

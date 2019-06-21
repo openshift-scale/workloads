@@ -4,8 +4,9 @@ The network tests playbook is `workloads/network.yml` and will test latency and 
 
 Requirements:
 * Labeling Nodes
-* HostNetwork - privileged pods
-* HostNetwork - Cloud firewall configuration to permit traffic for ports between 20010-20100 and NETWORK_TEST_UPERF_SSHD_PORT
+* HostNetwork - Cloud firewall configuration to permit traffic for ports `NETWORK_TEST_UPERF_SSHD_PORT`, uperf server ports between 20010-20109 and potentially `net.ipv4.ip_local_port_range` ports**
+
+** Typically `net.ipv4.ip_local_port_range` is set to `32768 60999` in which uperf will pick a few random ports to send flags over. Currently there is no method outside of sysctls to control those ports - [See pbench issue #1238](https://github.com/distributed-system-analysis/pbench/issues/1238)
 
 Running from CLI:
 
@@ -100,7 +101,7 @@ Basename used by cluster loader for the project(s) it creates.
 
 ### NETWORK_TEST_HOSTNETWORK
 Default: `false`  
-Enables/disables HostNetwork in podspec for Pod to Pod benchmarks. HostNetwork *requires* privileged pods. Pods with HostNetwork can be used to test network bandwidth and latency without the pod SDN.
+Enables/disables HostNetwork in podspec for Pod to Pod benchmarks. HostNetwork *requires* "AUDIT_WRITE" capability per scc. Pods with HostNetwork can be used to test network bandwidth and latency without the pod SDN.
 
 ### NETWORK_TEST_SERVICE
 Default: `false`  
@@ -136,7 +137,7 @@ Enables/disables if the network test will cleanup the project(s) that are create
 
 ## Notes for typical Network testing execution
 
-The recommended way to run the Network test is actually three iterations of the network playbook with the following parameters for each run.  The first run would test Pod to Pod, the 2nd - Pod to Pod with HostNetwork, and the 3rd - Service to Service which is the most expected usage inside an OpenShift Cluster (Pod -> Svc IP -> Pod).
+The recommended way to run the Network test is actually three iterations of the network playbook with the following parameters for each run. The first run would test Pod to Pod, the 2nd - Pod to Pod with HostNetwork, and the 3rd - Service to Service which is the most expected usage inside an OpenShift Cluster (Pod -> Svc IP -> Pod).
 
 ### Suggested Pod to Pod Test Configuration
 
@@ -178,7 +179,7 @@ NETWORK_TEST_SAMPLES=3
 NETWORK_TEST_CLEANUP=true
 ```
 
-Make sure `NETWORK_TEST_UPERF_SSHD_PORT` is enabled in your cloud environment to permit traffic when using HostNetwork.  HostNetwork testing *requires* privileged pods.
+Make sure `NETWORK_TEST_UPERF_SSHD_PORT` is enabled in your cloud environment to permit traffic when using HostNetwork. HostNetwork *requires* "AUDIT_WRITE" capability per scc.
 
 ### Suggested Service to Service Test Configuration
 

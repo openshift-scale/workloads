@@ -16,8 +16,8 @@
 
 ## Network
 
-| Test                       | Requirement                           |
-|:-------------------------- |:------------------------------------- |
-| Pod 2 Pod                  | Labeling Nodes                        |
-| Pod 2 Pod with HostNetwork | Labeling Nodes, Privileged Containers |
-| Service 2 Service          | Labeling Nodes                        |
+| Test                       | Requirement                                 |
+|:-------------------------- |:------------------------------------------- |
+| Pod 2 Pod                  | Labeling Nodes                              |
+| Pod 2 Pod with HostNetwork | Labeling Nodes, Open firewall ports at Host |
+| Service 2 Service          | Labeling Nodes                              |
