@@ -52,7 +52,6 @@ data:
           ifexists: delete
           pods:
             - num: {{total_pod_count.stdout|int}}
-              image: {{nodevertical_pod_image}}
               basename: nodevert
               file: nodevert-pod-labeled.yaml
       tuningsets:
