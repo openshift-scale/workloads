@@ -132,12 +132,12 @@ spec:
 {% endif %}
 {% if workload_job_node_selector %}
       nodeSelector:
-        node-role.kubernetes.io/pbench: ""
+        node-role.kubernetes.io/workload: ""
 {% endif %}
 {% if workload_job_taint %}
       tolerations:
       - key: "role"
-        value: "controller"
+        value: "workload"
         operator: "Equal"
         effect: "NoSchedule"
 {% endif %}

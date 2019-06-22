@@ -33,11 +33,11 @@ Container image that runs the workload script.
 
 ### WORKLOAD_JOB_NODE_SELECTOR
 Default: `true`  
-Enables/disables the node selector that places the workload job on the `pbench` node.
+Enables/disables the node selector that places the workload job on the `workload` node.
 
 ### WORKLOAD_JOB_TAINT
 Default: `true`  
-Enables/disables the toleration on the workload job to permit the `controller` taint.
+Enables/disables the toleration on the workload job to permit the `workload` taint.
 
 ### WORKLOAD_JOB_PRIVILEGED
 Default: `true`  
