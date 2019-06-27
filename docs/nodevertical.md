@@ -74,6 +74,10 @@ Future use for pbench and prometheus scraper to place results into git repo that
 Default: `360`  
 Number of retries for Ansible to poll if the workload job has completed. Poll attempts delay 10s between polls with some additional time taken for each polling action depending on the orchestration host setup.
 
+### NODEVERTICAL_NODE_COUNT
+Default: `4`
+Number of nodes to apply the nodevertical label to.  This isolates the nodevertical pods to achieve kubelet density.  You will have to adjust the value here for clusters < 5 nodes.
+
 ### NODEVERTICAL_TEST_PREFIX
 Default: `nodevertical`  
 Test to prefix the pbench results.
@@ -105,6 +109,7 @@ Period of time (in seconds) for cluster loader to pause after creating pods and 
 ## Smoke test variables
 
 ```
+NODEVERTICAL_NODE_COUNT=4
 NODEVERTICAL_TEST_PREFIX=nodevertical_smoke
 NODEVERTICAL_CLEANUP=true
 NODEVERTICAL_BASENAME=nodevertical

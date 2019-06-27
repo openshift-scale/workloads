@@ -34,6 +34,7 @@ scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', 
 job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
 
 # NodeVertical workload specific parameters:
+nodevertical_node_count: "{{ lookup('env', 'NODEVERTICAL_NODE_COUNT')|default(4, true)|int }}"
 nodevertical_test_prefix: "{{ lookup('env', 'NODEVERTICAL_TEST_PREFIX')|default('nodevertical', true) }}"
 nodevertical_cleanup: "{{ lookup('env', 'NODEVERTICAL_CLEANUP')|default(true, true)|bool|lower }}"
 nodevertical_basename: "{{ lookup('env', 'NODEVERTICAL_BASENAME')|default('nodevertical', true) }}"
