@@ -1,16 +1,16 @@
 ---
 #
-# Runs network benchmarks on an existing RHCOS cluster
+# Runs scale workload on an existing RHCOS cluster
 #
 
-- name: Runs network benchmarks on a RHCOS cluster
+- name: Runs scale workload on a RHCOS cluster
   hosts: orchestration
   gather_facts: true
   remote_user: "{{orchestration_user}}"
   vars_files:
-    - vars/network.yml
+    - vars/scale.yml
   vars:
-    workload_job: "network"
+    workload_job: "scale"
   tasks:
     - name: Create scale-ci-tooling directory
       file:
@@ -24,8 +24,8 @@
       with_items:
         - src: scale-ci-tooling-ns.yml
           dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
-        - src: workload-network-script-cm.yml
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-network-script-cm.yml"
+        - src: workload-scale-script-cm.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-scale-script-cm.yml"
 
     - name: Slurp kubeconfig file
       slurp:
@@ -42,22 +42,6 @@
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
 
-    - name: Remove network test labels from nodes
-      shell: |
-        oc label nodes -l node-role.kubernetes.io/worker= uperf-
-
-    - name: Label worker nodes with pbench agent for network tests
-      shell: |
-        oc get nodes --no-headers -l pbench_agent=true,node-role.kubernetes.io/worker= | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
-        oc get nodes --no-headers --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
-      when: enable_pbench_agents|bool
-
-    - name: Label worker nodes when there are no pbench agents for network tests
-      shell: |
-        oc get nodes --no-headers -l node-role.kubernetes.io/worker= | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
-        oc get nodes --no-headers --show-labels -l node-role.kubernetes.io/worker= | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
-      when: not enable_pbench_agents|bool
-
     - name: Template workload templates
       template:
         src: "{{item.src}}"
@@ -72,18 +56,18 @@
         - src: workload-job.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-network-env.yml"
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-scale-env.yml"
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |
-        oc project scale-ci-tooling
+        oc get project scale-ci-tooling
       ignore_errors: true
       changed_when: false
       register: scale_ci_tooling_ns_exists
 
-    - name: Ensure any stale scale-ci-network job is deleted
+    - name: Ensure any stale scale-ci-scale job is deleted
       shell: |
-        oc delete job scale-ci-network -n scale-ci-tooling
+        oc delete job scale-ci-scale -n scale-ci-tooling
       register: scale_ci_tooling_project
       failed_when: scale_ci_tooling_project.rc == 0
       until: scale_ci_tooling_project.rc == 1
@@ -101,7 +85,7 @@
           shell: |
             oc create serviceaccount useroot -n scale-ci-tooling
             oc adm policy add-scc-to-user privileged -z useroot -n scale-ci-tooling
-          when: enable_pbench_agents|bool or workload_job_privileged|bool
+          when: enable_pbench_agents|bool
       when: scale_ci_tooling_ns_exists.rc != 0
 
     - name: Create/replace kubeconfig secret
@@ -118,11 +102,11 @@
 
     - name: Create/replace workload script configmap
       shell: |
-        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-network-script-cm.yml"
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-scale-script-cm.yml"
 
     - name: Create/replace workload script environment configmap
       shell: |
-        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-network-env.yml"
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-scale-env.yml"
 
     - name: Create/replace workload job to that runs workload script
       shell: |
@@ -130,7 +114,7 @@
 
     - name: Poll until job is active
       shell: |
-        oc get job scale-ci-network -n scale-ci-tooling -o json
+        oc get job scale-ci-scale -n scale-ci-tooling -o json
       register: job_json
       retries: 60
       delay: 2
@@ -138,7 +122,7 @@
 
     - name: Poll until job is complete
       shell: |
-        oc get job scale-ci-network -n scale-ci-tooling -o json
+        oc get job scale-ci-scale -n scale-ci-tooling -o json
       register: job_json
       retries: "{{job_completion_poll_attempts}}"
       delay: 10

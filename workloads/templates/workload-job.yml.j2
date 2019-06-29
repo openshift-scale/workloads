@@ -97,10 +97,10 @@ spec:
         envFrom:
         - configMapRef:
             name: scale-ci-workload-http-env
-{% elif workload_job == "network" %}
+{% elif workload_job == "network" or workload_job == "scale" %}
         envFrom:
         - configMapRef:
-            name: scale-ci-workload-network-env
+            name: scale-ci-workload-{{workload_job}}-env
 {% endif %}
       volumes:
       - name: workload-script

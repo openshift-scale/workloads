@@ -5,6 +5,7 @@
 | [Tooling](tooling.md)                              | Setup pbench metric tools                 | Cluster-admin, Privileged Containers  |
 | [Test](test.md)                                    | Test/Run your workload from ssh Container | Cluster-admin, Privileged Containers  |
 | [Baseline](baseline.md)                            | Baseline metrics capture                  | Tooling job*                          |
+| [Scale](scale.md)                                  | Scales worker nodes                       | Cluster-admin                         |
 | [NodeVertical](nodevertical.md)                    | Node Kubelet Density                      | Labeling Nodes                        |
 | [PodVertical](podvertical.md)                      | Max Pod Density                           | None                                  |
 | [MasterVertical](mastervertical.md)                | Master Node Stress workload               | None                                  |

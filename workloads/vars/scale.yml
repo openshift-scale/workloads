@@ -1,0 +1,38 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# Scale workload variables.
+##############################################################################
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(true, true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(false, true)|bool }}"
+
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_instrumentation: "{{ lookup('env', 'PBENCH_INSTRUMENTATION')|default(false, true)|bool|lower }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workloads
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
+
+# scale workload specific parameters:
+scale_test_prefix: "{{ lookup('env', 'SCALE_TEST_PREFIX')|default('scale', true) }}"
+scale_metadata_prefix: "{{ lookup('env', 'SCALE_METADATA_PREFIX')|default('machine.openshift.io', true) }}"
+scale_worker_count: "{{ lookup('env', 'SCALE_WORKER_COUNT')|default(5, true)|int }}"
+scale_poll_attempts: "{{ lookup('env', 'SCALE_POLL_ATTEMPTS')|default(600, true) }}"
+
+# Pass/fail criteria
+expected_scale_duration: "{{ lookup('env', 'EXPECTED_SCALE_DURATION')|default(600, true)|int }}"

@@ -1,8 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: scale-ci-workload-network-env
+  name: scale-ci-workload-{{workload_job}}-env
 data:
+{% if workload_job == "network" %}
   NETWORK_TEST_UPERF_IMAGE: "{{network_test_uperf_image}}"
   NETWORK_TEST_UPERF_SSHD_PORT: "{{network_test_uperf_sshd_port}}"
   NETWORK_TEST_UPERF_PORT_RANGE: "{{network_test_uperf_port_range}}"
@@ -21,3 +22,11 @@ data:
   NETWORK_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
   NETWORK_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
   NETWORK_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
+{% elif workload_job == "scale" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  SCALE_TEST_PREFIX: "{{scale_test_prefix}}"
+  SCALE_METADATA_PREFIX: "{{scale_metadata_prefix}}"
+  SCALE_WORKER_COUNT: "{{scale_worker_count}}"
+  SCALE_POLL_ATTEMPTS: "{{scale_poll_attempts}}"
+  EXPECTED_SCALE_DURATION: "{{expected_scale_duration}}"
+{% endif %}

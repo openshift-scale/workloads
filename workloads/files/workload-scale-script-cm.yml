@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    # pbench Configuration
+    echo "$(date -u) Configuring pbench for running Scale workload"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for Scale workload run"
+    # End pbench Configuration
+
+    echo "$(date -u) Running scale workload"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+      pbench-copy-results --prefix ${SCALE_TEST_PREFIX}
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    echo "$(date -u) Completed Scale workload run"
+
+    echo "$(date -u) Checking Test Results"
+    echo "$(date -u) Checking Test Exit Code"
+    if [ $(jq '.exit_code==0' ${result_dir}/exit.json) == "false" ]; then
+      echo "$(date -u) Test Failure"
+      echo "$(date -u) Test Analysis: Failed"
+      exit 1
+    fi
+    echo "$(date -u) Comparing scale duration to expected duration"
+    echo "$(date -u) Scaling Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ $(jq '.duration>'${EXPECTED_SCALE_DURATION}'' ${result_dir}/exit.json) == "true" ]; then
+      echo "$(date -u) EXPECTED_SCALE_DURATION (${EXPECTED_SCALE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      echo "$(date -u) Test Analysis: Failed"
+      exit 1
+    fi
+    echo "$(date -u) Test Analysis: Passed"
+  workload.sh: |
+    #!/bin/sh
+    set -eo pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    cluster_name=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "'${SCALE_METADATA_PREFIX}'/cluster-api-cluster")}}')
+    cluster_region=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index .items 0 ).spec.template.spec.providerSpec.value.placement.region }}')
+
+    az_a_count=$(((${SCALE_WORKER_COUNT}+3)/4))
+    az_b_count=$(((${SCALE_WORKER_COUNT}+2)/4))
+    az_c_count=$(((${SCALE_WORKER_COUNT}+1)/4))
+    az_d_count=$((${SCALE_WORKER_COUNT}/4))
+
+    start_time=$(date +%s)
+    echo "$(date -u) Scaling ${cluster_region}a to ${az_a_count}"
+    oc patch machineset ${cluster_name}-worker-${cluster_region}a --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
+    echo "$(date -u) Scaling ${cluster_region}b to ${az_b_count}"
+    oc patch machineset ${cluster_name}-worker-${cluster_region}b --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
+    echo "$(date -u) Scaling ${cluster_region}c to ${az_c_count}"
+    oc patch machineset ${cluster_name}-worker-${cluster_region}c --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_c_count}' }}'
+    echo "$(date -u) Scaling ${cluster_region}d to ${az_d_count}"
+    oc patch machineset ${cluster_name}-worker-${cluster_region}d --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_d_count}' }}'
+
+    retries=0
+    while [ ${retries} -le ${SCALE_POLL_ATTEMPTS} ] ; do
+      worker_count=`oc get nodes -l node-role.kubernetes.io/worker= --no-headers | grep " Ready" -c`
+      if [ "${worker_count}" == "${SCALE_WORKER_COUNT}" ]; then
+        echo "$(date -u) Cluster Scaled to ${SCALE_WORKER_COUNT}"
+        break
+      else
+        echo "$(date -u) Cluster Scaling from ${worker_count} to ${SCALE_WORKER_COUNT}, Poll attempts: ${retries}/${SCALE_POLL_ATTEMPTS}"
+        sleep 2
+      fi
+      retries=$[${retries} + 1]
+    done
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+    exit_code=0
+    if [ "${worker_count}" != "${SCALE_WORKER_COUNT}" ]; then
+      echo "$(date -u) Cluster failed to scale to ${SCALE_WORKER_COUNT} in (${SCALE_POLL_ATTEMPTS} * 2s)"
+      exit_code=1
+    fi
+    echo "$(date -u) Writing Exit Code and Duration"
+    jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
