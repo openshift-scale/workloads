@@ -276,7 +276,7 @@ data:
   pvcscale.yml: |
     provider: local
     ClusterLoader:
-      cleanup: {{ pvcscale_cleanup }}
+      cleanup: false
       projects:
         - num: 1
           basename: {{ pvcscale_basename }}
