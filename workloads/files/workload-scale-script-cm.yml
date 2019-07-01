@@ -6,16 +6,17 @@ data:
   run.sh: |
     #!/bin/sh
     set -eo pipefail
-    # pbench Configuration
-    echo "$(date -u) Configuring pbench for running Scale workload"
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    workload_log "Configuring pbench for running Scale workload"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    echo "" > /var/lib/pbench-agent/tools-default/oc
-    echo "workload" > /var/lib/pbench-agent/tools-default/label
     if [[ -v ENABLE_PBENCH_AGENTS ]]; then
       echo "" > /var/lib/pbench-agent/tools-default/disk
       echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
       echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
       echo "" > /var/lib/pbench-agent/tools-default/perf
       echo "" > /var/lib/pbench-agent/tools-default/pidstat
       master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
@@ -32,35 +33,38 @@ data:
       done
     fi
     source /opt/pbench-agent/profile
-    echo "$(date -u) Done configuring pbench for Scale workload run"
-    # End pbench Configuration
+    workload_log "Done configuring pbench for Scale workload run"
 
-    echo "$(date -u) Running scale workload"
+    workload_log "Running scale workload"
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       pbench-user-benchmark -- sh /root/workload/workload.sh
       result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
-      pbench-copy-results --prefix ${SCALE_TEST_PREFIX}
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${SCALE_TEST_PREFIX}
+      fi
     else
       sh /root/workload/workload.sh
       result_dir=/tmp
     fi
-    echo "$(date -u) Completed Scale workload run"
+    workload_log "Completed Scale workload run"
 
-    echo "$(date -u) Checking Test Results"
-    echo "$(date -u) Checking Test Exit Code"
+    workload_log "Checking Test Results"
+    workload_log "Checking Test Exit Code"
     if [ $(jq '.exit_code==0' ${result_dir}/exit.json) == "false" ]; then
-      echo "$(date -u) Test Failure"
-      echo "$(date -u) Test Analysis: Failed"
+      workload_log "Test Failure"
+      workload_log "Test Analysis: Failed"
       exit 1
     fi
-    echo "$(date -u) Comparing scale duration to expected duration"
-    echo "$(date -u) Scaling Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    workload_log "Comparing scale duration to expected duration"
+    workload_log "Scaling Duration: $(jq '.duration' ${result_dir}/exit.json)"
     if [ $(jq '.duration>'${EXPECTED_SCALE_DURATION}'' ${result_dir}/exit.json) == "true" ]; then
-      echo "$(date -u) EXPECTED_SCALE_DURATION (${EXPECTED_SCALE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
-      echo "$(date -u) Test Analysis: Failed"
+      workload_log "EXPECTED_SCALE_DURATION (${EXPECTED_SCALE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      workload_log "Test Analysis: Failed"
       exit 1
     fi
-    echo "$(date -u) Test Analysis: Passed"
+    # TODO: Check pbench-agent collected metrics for Pass/Fail
+    # TODO: Check prometheus collected metrics for Pass/Fail
+    workload_log "Test Analysis: Passed"
   workload.sh: |
     #!/bin/sh
     set -eo pipefail
@@ -78,23 +82,23 @@ data:
     az_d_count=$((${SCALE_WORKER_COUNT}/4))
 
     start_time=$(date +%s)
-    echo "$(date -u) Scaling ${cluster_region}a to ${az_a_count}"
+    workload_log "Scaling ${cluster_region}a to ${az_a_count}"
     oc patch machineset ${cluster_name}-worker-${cluster_region}a --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
-    echo "$(date -u) Scaling ${cluster_region}b to ${az_b_count}"
+    workload_log "Scaling ${cluster_region}b to ${az_b_count}"
     oc patch machineset ${cluster_name}-worker-${cluster_region}b --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
-    echo "$(date -u) Scaling ${cluster_region}c to ${az_c_count}"
+    workload_log "Scaling ${cluster_region}c to ${az_c_count}"
     oc patch machineset ${cluster_name}-worker-${cluster_region}c --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_c_count}' }}'
-    echo "$(date -u) Scaling ${cluster_region}d to ${az_d_count}"
+    workload_log "Scaling ${cluster_region}d to ${az_d_count}"
     oc patch machineset ${cluster_name}-worker-${cluster_region}d --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_d_count}' }}'
 
     retries=0
     while [ ${retries} -le ${SCALE_POLL_ATTEMPTS} ] ; do
       worker_count=`oc get nodes -l node-role.kubernetes.io/worker= --no-headers | grep " Ready" -c`
       if [ "${worker_count}" == "${SCALE_WORKER_COUNT}" ]; then
-        echo "$(date -u) Cluster Scaled to ${SCALE_WORKER_COUNT}"
+        workload_log "Cluster Scaled to ${SCALE_WORKER_COUNT}"
         break
       else
-        echo "$(date -u) Cluster Scaling from ${worker_count} to ${SCALE_WORKER_COUNT}, Poll attempts: ${retries}/${SCALE_POLL_ATTEMPTS}"
+        workload_log "Cluster Scaling from ${worker_count} to ${SCALE_WORKER_COUNT}, Poll attempts: ${retries}/${SCALE_POLL_ATTEMPTS}"
         sleep 2
       fi
       retries=$[${retries} + 1]
@@ -103,8 +107,8 @@ data:
     duration=$((end_time-start_time))
     exit_code=0
     if [ "${worker_count}" != "${SCALE_WORKER_COUNT}" ]; then
-      echo "$(date -u) Cluster failed to scale to ${SCALE_WORKER_COUNT} in (${SCALE_POLL_ATTEMPTS} * 2s)"
+      workload_log "Cluster failed to scale to ${SCALE_WORKER_COUNT} in (${SCALE_POLL_ATTEMPTS} * 2s)"
       exit_code=1
     fi
-    echo "$(date -u) Writing Exit Code and Duration"
+    workload_log "Writing Exit Code and Duration"
     jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"

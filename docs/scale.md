@@ -49,11 +49,15 @@ Location of kubeconfig on orchestration host.
 
 ### PBENCH_INSTRUMENTATION
 Default: `false`  
-Enables running the workload wrapped by pbench-user-benchmark in order to copy results to `PBENCH_SERVER`.
+Enables/disables running the workload wrapped by pbench-user-benchmark. When enabled, pbench agents can then be enabled (`ENABLE_PBENCH_AGENTS`) for further instrumentation data and pbench-copy-results can be enabled (`ENABLE_PBENCH_COPY`) to export captured data for further analysis.
 
 ### ENABLE_PBENCH_AGENTS
 Default: `false`  
 Enables/disables the collection of pbench data on the pbench agent Pods. These Pods are deployed by the tooling playbook.
+
+### ENABLE_PBENCH_COPY
+Default: `false`  
+Enables/disables the copying of pbench data to a remote results server for further analysis.
 
 ### PBENCH_SSH_PRIVATE_KEY_FILE
 Default: `~/.ssh/id_rsa`  

@@ -1,6 +1,6 @@
 ---
 #
-# Runs NodeVertical on an existing RHCOS cluster
+# Runs NodeVertical test
 #
 
 - name: Runs NodeVertical on a RHCOS cluster
@@ -24,6 +24,8 @@
       with_items:
         - src: scale-ci-tooling-ns.yml
           dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
+        - src: workload-nodevertical-script-cm.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
 
     - name: Slurp kubeconfig file
       slurp:
@@ -89,8 +91,8 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
         - src: workload-job.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
-        - src: workload-nodevertical-script-cm.yml.j2
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
+        - src: workload-env.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-env.yml"
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |
@@ -137,6 +139,10 @@
     - name: Create/replace workload script configmap
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
+
+    - name: Create/replace workload script environment configmap
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-env.yml"
 
     - name: Create/replace workload job to that runs workload script
       shell: |
