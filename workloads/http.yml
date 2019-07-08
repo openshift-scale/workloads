@@ -113,13 +113,13 @@
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
 
-    - name: Poll until job is active
+    - name: Poll until job pod is running
       shell: |
-        oc get job scale-ci-http -n scale-ci-tooling -o json
-      register: job_json
+        oc get pods --selector=job-name=scale-ci-http -n scale-ci-tooling -o json
+      register: pod_json
       retries: 60
       delay: 2
-      until: job_json.stdout | from_json | json_query('status.active==`1`')
+      until: pod_json.stdout | from_json | json_query('items[0].status.phase==`Running`')
 
     - name: Poll until job is complete
       shell: |
