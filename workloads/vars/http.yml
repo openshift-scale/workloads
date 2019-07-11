@@ -7,18 +7,13 @@ ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rs
 
 orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
 ###############################################################################
-# RHCOS http workload variables.
+# HTTP workload variables.
 ###############################################################################
-
-# Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
 
-# Use nodeselector to place workload job on specific node
 workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(true, true)|bool }}"
-# Tolerate taint on workload driver
 workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
 
-# Kubeconfig for tooling container script
 kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
 
 # pbench variables

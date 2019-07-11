@@ -3,7 +3,11 @@ kind: ConfigMap
 metadata:
   name: scale-ci-workload-{{workload_job}}-env
 data:
-{% if workload_job == "network" %}
+{% if workload_job == "http" %}
+{% for v in http_env_vars %}
+  {{ v }}: "{{ lookup('env', v) }}"
+{% endfor %}
+{% elif workload_job == "network" %}
   NETWORK_TEST_UPERF_IMAGE: "{{network_test_uperf_image}}"
   NETWORK_TEST_UPERF_SSHD_PORT: "{{network_test_uperf_sshd_port}}"
   NETWORK_TEST_UPERF_PORT_RANGE: "{{network_test_uperf_port_range}}"

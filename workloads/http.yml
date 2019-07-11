@@ -56,7 +56,7 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
         - src: workload-job.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
-        - src: workload-http-env.yml.j2
+        - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-http-env.yml"
 
     - name: Check if scale-ci-tooling namespace exists
