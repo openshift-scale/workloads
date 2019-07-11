@@ -23,3 +23,21 @@
 | Pod 2 Pod                  | Labeling Nodes                              |
 | Pod 2 Pod with HostNetwork | Labeling Nodes, Open firewall ports at Host |
 | Service 2 Service          | Labeling Nodes                              |
+
+## CI Pass/Fail
+
+Each workload will implement a form of pass/fail criteria in order to flag if the tests have failed in CI.
+
+| Workload/tooling                                   | Pass/Fail                     |
+|:-------------------------------------------------- |:----------------------------- |
+| [Tooling](tooling.md)                              | NA                            |
+| [Test](test.md)                                    | NA                            |
+| [Baseline](baseline.md)                            | NA                            |
+| [Scale](scale.md)                                  | Yes: Test Duration            |
+| [NodeVertical](nodevertical.md)                    | Yes: Exit Code, Test Duration |
+| [PodVertical](podvertical.md)                      | In Progress                   |
+| [MasterVertical](mastervertical.md)                | In Progress                   |
+| [HTTP](http.md)                                    | No                            |
+| [Network](network.md)                              | No                            |
+| [Deployments Per Namespace](deployments-per-ns.md) | No                            |
+| [PVCscale](pvscale.md)                             | No                            |
