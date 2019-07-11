@@ -93,11 +93,7 @@ spec:
         ports:
         - containerPort: 2022
 {% endif %}
-{% if workload_job == "http" %}
-        envFrom:
-        - configMapRef:
-            name: scale-ci-workload-http-env
-{% elif workload_job == "network" or workload_job == "nodevertical" or workload_job == "scale" %}
+{% if workload_job == "http" or workload_job == "network" or workload_job == "nodevertical" or workload_job == "podvertical" or workload_job == "scale" %}
         envFrom:
         - configMapRef:
             name: scale-ci-workload-{{workload_job}}-env

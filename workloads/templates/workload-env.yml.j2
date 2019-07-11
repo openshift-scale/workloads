@@ -39,6 +39,18 @@ data:
   NODEVERTICAL_PAUSE: "{{nodevertical_pause}}"
   NODEVERTICAL_TS_TIMEOUT: "{{nodevertical_ts_timeout}}"
   EXPECTED_NODEVERTICAL_DURATION: "{{expected_nodevertical_duration}}"
+{% elif workload_job == "podvertical" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  PODVERTICAL_TEST_PREFIX: "{{podvertical_test_prefix}}"
+  PODVERTICAL_CLEANUP: "{{podvertical_cleanup}}"
+  PODVERTICAL_BASENAME: "{{podvertical_basename}}"
+  PODVERTICAL_MAXPODS: "{{podvertical_maxpods}}"
+  PODVERTICAL_POD_IMAGE: "{{podvertical_pod_image}}"
+  PODVERTICAL_STEPSIZE: "{{podvertical_stepsize}}"
+  PODVERTICAL_PAUSE: "{{podvertical_pause}}"
+  PODVERTICAL_TS_TIMEOUT: "{{podvertical_ts_timeout}}"
+  EXPECTED_PODVERTICAL_DURATION: "{{expected_podvertical_duration}}"
 {% elif workload_job == "scale" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"

@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    workload_log "Configuring pbench for PodVertical"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    workload_log "Done configuring pbench for PodVertical"
+
+    workload_log "Configuring PodVertical test"
+    envsubst < /root/workload/podvertical.yaml.template > /tmp/podvertical.yaml
+    envsubst < /root/workload/podvert-pod.yaml.template > /tmp/podvert-pod.yaml
+    workload_log "Done configuring PodVertical test"
+
+    workload_log "Running PodVertical"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${PODVERTICAL_TEST_PREFIX}
+      fi
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    workload_log "Completed PodVertical"
+
+    workload_log "Checking Test Results"
+    workload_log "Checking Cluster Loader Exit Code"
+    if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
+      workload_log "Cluster Loader Failure"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Comparing PodVertical duration to expected duration"
+    workload_log "PodVertical Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ "$(jq '.duration>'${EXPECTED_PODVERTICAL_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
+      workload_log "EXPECTED_PODVERTICAL_DURATION (${EXPECTED_PODVERTICAL_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"
+    # TODO: Check pbench-agent collected metrics for Pass/Fail
+    # TODO: Check prometheus collected metrics for Pass/Fail
+    workload_log "Test Analysis: Passed"
+  workload.sh: |
+    #!/bin/sh
+    set -o pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    start_time=$(date +%s)
+    VIPERCONFIG=/tmp/podvertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    exit_code=$?
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+
+    workload_log "Writing Cluster Loader Exit Code"
+    jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
+    workload_log "Writing Cluster Loader Metrics to clusterloader.json"
+    grep "cluster_loader_marker" ${result_dir}/clusterloader.txt > "${result_dir}/clusterloader.json"
+
+    workload_log "Finished workload script"
+  podvertical.yaml.template: |
+    provider: local
+    ClusterLoader:
+      cleanup: ${PODVERTICAL_CLEANUP}
+      projects:
+        - num: 1
+          basename: ${PODVERTICAL_BASENAME}
+          tuning: default
+          ifexists: delete
+          pods:
+            - num: ${PODVERTICAL_MAXPODS}
+              basename: podvert
+              file: podvert-pod.yaml
+      tuningsets:
+        - name: default
+          pods:
+            stepping:
+              stepsize: ${PODVERTICAL_STEPSIZE}
+              pause: ${PODVERTICAL_PAUSE}
+              timeout: ${PODVERTICAL_TS_TIMEOUT}
+            ratelimit:
+              delay: 0
+  podvert-pod.yaml.template: |
+    ---
+    kind: Pod
+    apiVersion: v1
+    metadata:
+      name: podvert
+      labels:
+        name: podvert
+    spec:
+      containers:
+      - name: podvert
+        image: ${PODVERTICAL_POD_IMAGE}
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: false

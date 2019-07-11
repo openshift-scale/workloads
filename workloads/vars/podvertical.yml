@@ -7,26 +7,22 @@ ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rs
 
 orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
 ###############################################################################
-# RHCOS podvertical workload variables.
+# PodVertical workload variables.
 ###############################################################################
-
-# Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
 
-# Use nodeselector to place workload job on specific node
-workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(true, true)|bool }}"
-# Tolerate taint on workload driver
-workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
-# Privileged job container
-workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(true, true)|bool }}"
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(false, true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(false, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(false, true)|bool }}"
 
-# Kubeconfig for tooling container script
 kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
 
 # pbench variables
+pbench_instrumentation: "{{ lookup('env', 'PBENCH_INSTRUMENTATION')|default(false, true)|bool|lower }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+enable_pbench_copy: "{{ lookup('env', 'ENABLE_PBENCH_COPY')|default(false, true)|bool|lower }}"
 pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
 pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
-enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
 pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
 
 # Other variables for workload tests
@@ -41,3 +37,7 @@ podvertical_maxpods: "{{ lookup('env', 'PODVERTICAL_MAXPODS')|default(1000, true
 podvertical_pod_image: "{{ lookup('env', 'PODVERTICAL_POD_IMAGE')|default('gcr.io/google_containers/pause-amd64:3.0', true) }}"
 podvertical_stepsize: "{{ lookup('env', 'PODVERTICAL_STEPSIZE')|default(500, true)|int }}"
 podvertical_pause: "{{ lookup('env', 'PODVERTICAL_PAUSE')|default(30, true)|int }}"
+podvertical_ts_timeout: "{{ lookup('env', 'PODVERTICAL_TS_TIMEOUT')|default(600, true)|int }}"
+
+# Pass/fail criteria
+expected_podvertical_duration: "{{ lookup('env', 'EXPECTED_PODVERTICAL_DURATION')|default(600, true)|int }}"
