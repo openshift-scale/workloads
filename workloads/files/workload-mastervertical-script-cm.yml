@@ -6,8 +6,9 @@ data:
   run.sh: |
     #!/bin/sh
     set -eo pipefail
-    # pbench Configuration
-    echo "$(date -u) Configuring pbench for Master Vertical"
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    workload_log "Configuring pbench for MasterVertical"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
@@ -33,44 +34,92 @@ data:
       done
     fi
     source /opt/pbench-agent/profile
-    echo "$(date -u) Done configuring pbench for Master Vertical"
-    # End pbench Configuration
+    workload_log "Done configuring pbench for MasterVertical"
 
-    # Start of Test Code
-    echo "$(date -u) Running Master Vertical"
-    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/mastervertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
-    pbench-copy-results --prefix {{mastervertical_test_prefix}}
-    echo "$(date -u) Completed Master Vertical"
-    # End of Test Code
-  mastervertical.yaml: |
+    workload_log "Configuring MasterVertical test"
+    envsubst < /root/workload/mastervertical.yaml.template > /tmp/mastervertical.yaml
+    workload_log "Done configuring MasterVertical test"
+
+    workload_log "Running MasterVertical workload"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${MASTERVERTICAL_TEST_PREFIX}
+      fi
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    workload_log "Completed MasterVertical workload run"
+
+    workload_log "Checking Test Results"
+    workload_log "Checking Cluster Loader Exit Code"
+    if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
+      workload_log "Cluster Loader Failure"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Comparing MasterVertical duration to expected duration"
+    workload_log "MasterVertical Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ "$(jq '.duration>'${EXPECTED_MASTERVERTICAL_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
+      workload_log "EXPECTED_MASTERVERTICAL_DURATION (${EXPECTED_MASTERVERTICAL_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"
+    # TODO: Check pbench-agent collected metrics for Pass/Fail
+    # TODO: Check prometheus collected metrics for Pass/Fail
+    workload_log "Test Analysis: Passed"
+  workload.sh: |
+    #!/bin/sh
+    set -o pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    start_time=$(date +%s)
+    VIPERCONFIG=/tmp/mastervertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    exit_code=$?
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+
+    workload_log "Writing Cluster Loader Exit Code"
+    jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
+    workload_log "Writing Cluster Loader Metrics to clusterloader.json"
+    grep "cluster_loader_marker" ${result_dir}/clusterloader.txt > "${result_dir}/clusterloader.json"
+
+    workload_log "Finished workload script"
+  mastervertical.yaml.template: |
     provider: local
     ClusterLoader:
-      cleanup: {{mastervertical_cleanup}}
+      cleanup: ${MASTERVERTICAL_CLEANUP}
       projects:
-        - num: {{mastervertical_projects}}
-          basename: {{mastervertical_basename}}
+        - num: ${MASTERVERTICAL_PROJECTS}
+          basename: ${MASTERVERTICAL_BASENAME}
           ifexists: delete
           templates:
             - num: 3
-              file: build-config-template.yaml
+              file: /root/workload/build-config-template.yaml
             - num: 3
-              file: bc-imagestream-template.yaml
+              file: /root/workload/bc-imagestream-template.yaml
             - num: 6
-              file: build-template.yaml
+              file: /root/workload/build-template.yaml
             - num: 6
-              file: build-imagestream-template.yaml
+              file: /root/workload/build-imagestream-template.yaml
             - num: 2
-              file: deployment-config-1rep-pause-template.yaml
+              file: /root/workload/deployment-config-1rep-pause-template.yaml
               parameters:
                 - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
             - num: 1
-              file: deployment-config-2rep-pause-template.yaml
+              file: /root/workload/deployment-config-2rep-pause-template.yaml
               parameters:
                 - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
             - num: 20
-              file: ssh-secret-template.yaml
+              file: /root/workload/ssh-secret-template.yaml
             - num: 3
-              file: route-template.yaml
+              file: /root/workload/route-template.yaml
   build-config-template.yaml: |
     ---
     Kind: Template

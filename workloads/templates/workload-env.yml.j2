@@ -8,6 +8,14 @@ data:
 {% for v in http_env_vars %}
   {{ v }}: "{{ lookup('env', v) }}"
 {% endfor %}
+{% elif workload_job == "mastervertical" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  MASTERVERTICAL_TEST_PREFIX: "{{mastervertical_test_prefix}}"
+  MASTERVERTICAL_CLEANUP: "{{mastervertical_cleanup}}"
+  MASTERVERTICAL_BASENAME: "{{mastervertical_basename}}"
+  MASTERVERTICAL_PROJECTS: "{{mastervertical_projects}}"
+  EXPECTED_MASTERVERTICAL_DURATION: "{{expected_mastervertical_duration}}"
 {% elif workload_job == "network" %}
   NETWORK_TEST_UPERF_IMAGE: "{{network_test_uperf_image}}"
   NETWORK_TEST_UPERF_SSHD_PORT: "{{network_test_uperf_sshd_port}}"

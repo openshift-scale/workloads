@@ -32,20 +32,32 @@ Default: `quay.io/openshift-scale/scale-ci-workload`
 Container image that runs the workload script.
 
 ### WORKLOAD_JOB_NODE_SELECTOR
-Default: `true`  
+Default: `false`  
 Enables/disables the node selector that places the workload job on the `workload` node.
 
 ### WORKLOAD_JOB_TAINT
-Default: `true`  
+Default: `false`  
 Enables/disables the toleration on the workload job to permit the `workload` taint.
 
 ### WORKLOAD_JOB_PRIVILEGED
-Default: `true`  
+Default: `false`  
 Enables/disables running the workload pod as privileged.
 
 ### KUBECONFIG_FILE
 Default: `~/.kube/config`  
 Location of kubeconfig on orchestration host.
+
+### PBENCH_INSTRUMENTATION
+Default: `false`  
+Enables/disables running the workload wrapped by pbench-user-benchmark. When enabled, pbench agents can then be enabled (`ENABLE_PBENCH_AGENTS`) for further instrumentation data and pbench-copy-results can be enabled (`ENABLE_PBENCH_COPY`) to export captured data for further analysis.
+
+### ENABLE_PBENCH_AGENTS
+Default: `false`  
+Enables/disables the collection of pbench data on the pbench agent Pods. These Pods are deployed by the tooling playbook.
+
+### ENABLE_PBENCH_COPY
+Default: `false`  
+Enables/disables the copying of pbench data to a remote results server for further analysis.
 
 ### PBENCH_SSH_PRIVATE_KEY_FILE
 Default: `~/.ssh/id_rsa`  
@@ -54,10 +66,6 @@ Location of ssh private key to authenticate to the pbench results server.
 ### PBENCH_SSH_PUBLIC_KEY_FILE
 Default: `~/.ssh/id_rsa.pub`  
 Location of the ssh public key to authenticate to the pbench results server.
-
-### ENABLE_PBENCH_AGENTS
-Default: `false`  
-Enables/disables the collection of pbench data on the pbench agent pods. These pods are deployed by the tooling playbook.
 
 ### PBENCH_SERVER
 Default: There is no public default.  
@@ -86,6 +94,10 @@ Basename used by cluster loader for the project(s) it creates.
 ### MASTERVERTICAL_PROJECTS
 Default: `1000`  
 Maximum number of projects that will be created by the mastervertical workload. Typically much higher values are used than the default for large scale tests.
+
+### EXPECTED_MASTERVERTICAL_DURATION
+Default: `600`  
+Pass/fail criteria. Value to determine if MasterVertical workload executed in duration expected.
 
 ## Smoke test variables
 
