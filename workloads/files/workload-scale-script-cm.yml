@@ -11,7 +11,7 @@ data:
     workload_log "Configuring pbench for running Scale workload"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+    if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
       echo "" > /var/lib/pbench-agent/tools-default/disk
       echo "" > /var/lib/pbench-agent/tools-default/iostat
       echo "workload" > /var/lib/pbench-agent/tools-default/label

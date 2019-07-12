@@ -10,12 +10,12 @@ data:
     echo "$(date -u) Configuring pbench for Deployments per namespace cluster limits test"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    echo "" > /var/lib/pbench-agent/tools-default/oc
-    echo "workload" > /var/lib/pbench-agent/tools-default/label
-    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+    if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
       echo "" > /var/lib/pbench-agent/tools-default/disk
       echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
       echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
       echo "" > /var/lib/pbench-agent/tools-default/perf
       echo "" > /var/lib/pbench-agent/tools-default/pidstat
       master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
@@ -41,7 +41,7 @@ data:
     pbench-copy-results --prefix {{deployments_per_ns_test_prefix}}
     echo "$(date -u) Completed running Deployments per ns cluster limits test"
     # End of Test Code
-  
+
   cluster-limits-deployments-per-namespace.yaml: |
     provider: local
     ClusterLoader:
@@ -62,7 +62,7 @@ data:
     apiVersion: v1
     metadata:
       name: deploymentConfigTemplate
-      creationTimestamp: 
+      creationTimestamp:
       annotations:
         description: This template will create a deploymentConfig with 1 replica and 4
           env vars
@@ -123,4 +123,4 @@ data:
       from: "[A-Za-z0-9]{255}"
       required: false
     labels:
-      template: deploymentConfigTemplate 
+      template: deploymentConfigTemplate

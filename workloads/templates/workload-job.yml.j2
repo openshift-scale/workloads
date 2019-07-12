@@ -86,18 +86,12 @@ spec:
             fieldRef:
               fieldPath: metadata.name
 {% if enable_pbench_agents %}
-        - name: ENABLE_PBENCH_AGENTS
-          value: "true"
-{% endif %}
-{% if enable_pbench_agents %}
         ports:
         - containerPort: 2022
 {% endif %}
-{% if workload_job == "http" or workload_job == "network" or workload_job == "nodevertical" or workload_job == "podvertical" or workload_job == "scale" %}
         envFrom:
         - configMapRef:
             name: scale-ci-workload-{{workload_job}}-env
-{% endif %}
       volumes:
       - name: workload-script
         configMap:

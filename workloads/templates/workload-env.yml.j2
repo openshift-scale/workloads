@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: scale-ci-workload-{{workload_job}}-env
 data:
+  ENABLE_PBENCH_AGENTS: "{{enable_pbench_agents|bool|lower}}"
 {% if workload_job == "http" %}
 {% for v in http_env_vars %}
   {{ v }}: "{{ lookup('env', v) }}"
