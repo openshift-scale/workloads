@@ -72,4 +72,12 @@ data:
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
   CONFORMANCE_TEST_PREFIX: "{{conformance_test_prefix}}"
+{% elif workload_job == "namespaces-per-cluster" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  NAMESPACES_PER_CLUSTER_TEST_PREFIX: "{{namespaces_per_cluster_test_prefix}}"
+  NAMESPACES_PER_CLUSTER_CLEANUP: "{{namespaces_per_cluster_cleanup}}"
+  NAMESPACES_PER_CLUSTER_BASENAME: "{{namespaces_per_cluster_basename}}"
+  NAMESPACES_PER_CLUSTER_COUNT: "{{namespaces_per_cluster_count}}"
+  EXPECTED_NAMESPACES_PER_CLUSTER_DURATION: "{{expected_namespaces_per_cluster_duration}}"
 {% endif %}

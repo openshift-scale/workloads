@@ -14,6 +14,7 @@
 | [Deployments Per Namespace](deployments-per-ns.md) | Maximum Deployments                       | None                                  |
 | [PVCscale](pvscale.md)                             | PVCScale test                             | Working storageclass                  |
 | [Conformance](conformance.md)                      | OCP/Kubernetes e2e tests                  | None                                  |
+| [Namespaces per cluster](namespaces-per-cluster.md) | Maximum Namespaces                       | None                                  |
 
 * Baseline job without a tooled cluster just idles a cluster.  The goal is to capture resource consumption over a period of time to characterize resource requirements thus tooling is required. (For now)
 
@@ -43,3 +44,4 @@ Each workload will implement a form of pass/fail criteria in order to flag if th
 | [Deployments Per Namespace](deployments-per-ns.md) | No                            |
 | [PVCscale](pvscale.md)                             | No                            |
 | [Conformance](conformance.md)                      | No                            |
+| [Namespaces per cluster](namespaces-per-cluster.md) | Yes: Exit code, Test Duration |
