@@ -117,7 +117,7 @@ The storageclass which will be used to allocated PVCs. It has to be present on c
 
 ### ACCESS_MODES
 Default: `ReadWriteOnce`  
-`ACCESS_MODES` is access_mode for PVC inside Pod. This field does not affect the test itself and might be removed in the future. 
+`ACCESS_MODES` is access_mode for PVC inside Pod. This field does not affect the test itself and might be removed in the future.
 
 ### Smoke test variables
 
@@ -141,10 +141,11 @@ PVCSCALE_PAUSE=0
 PVCSCALE_STORAGE_SIZE="1Gi"
 PVCSCALE_STORAGECLASS="storgage_class_name"
 ACCESS_MODES="ReadWriteOnce"
-# adapt PUBLIC_KEY and PRIVATE_KEY to your needs 
+# adapt PUBLIC_KEY and PRIVATE_KEY to your needs
 PUBLIC_KEY=~/.ssh/id_rsa.pub
 PRIVATE_KEY=~/.ssh/id_rsa
 echo "[orchestration]" > inventory
+echo "${ORCHESTRATION_HOST}" >> inventory
 ```
 
 After exporting above variables, execute test:
@@ -153,7 +154,7 @@ After exporting above variables, execute test:
 time ansible-playbook -v -i inventory workloads/workloads/pvcscale.yml
 ```
 
-### Test results 
+### Test results
 
 PVCScale test creates first the number of Pods specified in `PVCSCALE_MAXPODS` variable. Once all Pods are in `READY` state with PVC in `Bound` status,  PVCScale test collects data for all Pods when they are started, and from this information we can then see how long it takes to start Pods from Pod1..PodN.
 
