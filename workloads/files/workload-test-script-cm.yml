@@ -16,6 +16,7 @@ data:
       echo "" > /var/lib/pbench-agent/tools-default/oc
       echo "" > /var/lib/pbench-agent/tools-default/perf
       echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      echo "" > /var/lib/pbench-agent/tools-default/sar
       master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
       for node in $master_nodes; do
         echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
