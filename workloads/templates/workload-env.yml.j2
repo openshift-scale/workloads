@@ -68,4 +68,8 @@ data:
   SCALE_WORKER_COUNT: "{{scale_worker_count}}"
   SCALE_POLL_ATTEMPTS: "{{scale_poll_attempts}}"
   EXPECTED_SCALE_DURATION: "{{expected_scale_duration}}"
+{% elif workload_job == "conformance" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  CONFORMANCE_TEST_PREFIX: "{{conformance_test_prefix}}"
 {% endif %}

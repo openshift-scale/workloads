@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    workload_log "Configuring pbench for Conformance"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      echo "" > /var/lib/pbench-agent/tools-default/sar
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    workload_log "Done configuring pbench for Conformance"
+
+    workload_log "Running Conformance"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${CONFORMANCE_TEST_PREFIX}
+      fi
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    workload_log "Completed Conformance run"
+  workload.sh: |
+    #!/bin/sh
+    set -o pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    start_time=$(date +%s)
+    export KUBECONFIG=/root/.kube/config; /usr/bin/openshift-tests run openshift/conformance/parallel || exit 0
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+    workload_log "Finished running conformance and it took $duration"
