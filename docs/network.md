@@ -81,7 +81,7 @@ Pod image to use for pods that are pbench-uperf pods.
 
 ### NETWORK_TEST_UPERF_SSHD_PORT
 Default: `20000`  
-Port for pbench to communicate via ssh to server/client pods. Typically this port is not blocked by any firewalls when conducting Pod to Pod and Service to Service uperf benchmarks. Pod to Pod with HostNetwork will require that this port be opened in the cloud environment firewall along with the uperf port range.
+Port for pbench to communicate via ssh to server/client pods. Typically this port is not blocked by any firewalls when conducting Pod to Pod and Pod to Service uperf benchmarks. Pod to Pod with HostNetwork will require that this port be opened in the cloud environment firewall along with the uperf port range.
 
 ### NETWORK_TEST_UPERF_PORT_RANGE
 Default: `20010 20109`  
@@ -137,7 +137,7 @@ Enables/disables if the network test will cleanup the project(s) that are create
 
 ## Notes for typical Network testing execution
 
-The recommended way to run the Network test is actually three iterations of the network playbook with the following parameters for each run. The first run would test Pod to Pod, the 2nd - Pod to Pod with HostNetwork, and the 3rd - Service to Service which is the most expected usage inside an OpenShift Cluster (Pod -> Svc IP -> Pod).
+The recommended way to run the Network test is actually three iterations of the network playbook with the following parameters for each run. The first run would test Pod to Pod, the 2nd - Pod to Pod with HostNetwork, and the 3rd - Pod to Service which is the most expected usage inside an OpenShift Cluster (Pod -> Svc IP -> Pod).
 
 ### Suggested Pod to Pod Test Configuration
 
@@ -181,7 +181,7 @@ NETWORK_TEST_CLEANUP=true
 
 Make sure `NETWORK_TEST_UPERF_SSHD_PORT` is enabled in your cloud environment to permit traffic when using HostNetwork. HostNetwork *requires* "AUDIT_WRITE" capability per scc.
 
-### Suggested Service to Service Test Configuration
+### Suggested Pod to Service Test Configuration
 
 ```
 NETWORK_TEST_UPERF_IMAGE="quay.io/openshift-scale/scale-ci-uperf"
@@ -245,7 +245,7 @@ NETWORK_TEST_SAMPLES=1
 NETWORK_TEST_CLEANUP=true
 ```
 
-### Service to Service smoke test
+### Pod to Service smoke test
 
 ```
 NETWORK_TEST_UPERF_IMAGE="quay.io/openshift-scale/scale-ci-uperf"

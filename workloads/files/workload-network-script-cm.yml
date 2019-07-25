@@ -53,8 +53,8 @@ data:
     do
       log "Running Network benchmarks with ${pair_count} pair(s)"
       if [ "${NETWORK_TEST_SERVICE}" == "true" ]; then
-        config_prefix="S2S"
-        PAIR_COUNT=${pair_count} envsubst < /root/workload/s2s-network.yaml.template > /tmp/network.yaml
+        config_prefix="P2S"
+        PAIR_COUNT=${pair_count} envsubst < /root/workload/p2s-network.yaml.template > /tmp/network.yaml
         cp /root/workload/svc-template.yaml /tmp/svc-template.yaml
         # Append required ports to service template
         for i in `seq ${NETWORK_TEST_UPERF_PORT_RANGE}`
@@ -180,7 +180,7 @@ data:
           - NS_VALUE: "client"
           - UPERF_IMAGE: ${NETWORK_TEST_UPERF_IMAGE}
           - UPERF_SSHD_PORT: ${NETWORK_TEST_UPERF_SSHD_PORT}
-  s2s-network.yaml.template: |
+  p2s-network.yaml.template: |
     provider: local
     ClusterLoader:
       cleanup: false
