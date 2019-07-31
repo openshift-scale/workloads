@@ -80,7 +80,7 @@ data:
       result_dir=${benchmark_results_dir}
     fi
     start_time=$(date +%s)
-    VIPERCONFIG=/tmp/mastervertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    VIPERCONFIG=/tmp/mastervertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster concurrently with templates [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
     exit_code=$?
     end_time=$(date +%s)
     duration=$((end_time-start_time))
@@ -122,8 +122,8 @@ data:
               file: /root/workload/route-template.yaml
   build-config-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: buildConfigTemplate
       creationTimestamp:
@@ -167,8 +167,8 @@ data:
       template: buildConfigTemplate
   bc-imagestream-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: imagestreamTemplate
       creationTimestamp:
@@ -200,8 +200,8 @@ data:
       template: imagestreamTemplate
   build-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: buildTemplate
       creationTimestamp:
@@ -243,8 +243,8 @@ data:
       template: buildTemplate
   build-imagestream-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: imagestreamTemplate
       creationTimestamp:
@@ -266,8 +266,8 @@ data:
       template: imagestreamTemplate
   deployment-config-1rep-pause-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: deploymentConfigTemplate
       creationTimestamp:
@@ -351,8 +351,8 @@ data:
       template: deploymentConfigTemplate
   deployment-config-2rep-pause-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: deploymentConfigTemplate
       creationTimestamp:
@@ -432,8 +432,8 @@ data:
       template: deploymentConfigTemplate
   ssh-secret-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: sshSecretTemplate
       creationTimestamp:
@@ -457,8 +457,8 @@ data:
       template: sshSecretTemplate
   route-template.yaml: |
     ---
-    Kind: Template
-    apiVersion: v1
+    kind: Template
+    apiVersion: template.openshift.io/v1
     metadata:
       name: routeTemplate
       creationTimestamp:
