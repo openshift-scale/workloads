@@ -1,0 +1,40 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# Namespaces per cluster workload variables.
+###############################################################################
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(false, true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(false, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(false, true)|bool }}"
+
+# Kubeconfig for tooling container script
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_instrumentation: "{{ lookup('env', 'PBENCH_INSTRUMENTATION')|default(false, true)|bool|lower }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+enable_pbench_copy: "{{ lookup('env', 'ENABLE_PBENCH_COPY')|default(false, true)|bool|lower }}"
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
+
+# Services per namespace cluster limits workload specific parameters:
+services_per_namespace_test_prefix: "{{ lookup('env', 'SERVICES_PER_NAMESPACE_TEST_PREFIX')|default('services_per_namespace', true) }}"
+services_per_namespace_cleanup: "{{ lookup('env', 'SERVICES_PER_NAMESPACE_CLEANUP')|default(true, true)|bool|lower }}"
+services_per_namespace_basename: "{{ lookup('env', 'SERVICES_PER_NAMESPACE_BASENAME')|default('services-per-namespace', true) }}"
+services_per_namespace_projects: "{{ lookup('env', 'SERVICES_PER_NAMESPACE_PROJECTS')|default(2, true)|int }}"
+services_per_namespace_count:  "{{ lookup('env', 'SERVICES_PER_NAMESPACE_COUNT')|default(100, true)|int }}"
+
+# Pass/fail criteria
+expected_services_per_namespace_duration: "{{ lookup('env', 'EXPECTED_SERVICES_PER_NAMESPACE_DURATION')|default(600, true)|int }}"
