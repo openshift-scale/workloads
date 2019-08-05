@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    workload_log "Configuring pbench for services per namespace test"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      echo "" > /var/lib/pbench-agent/tools-default/sar
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    workload_log "Done configuring pbench for services per namespace test"
+
+    workload_log "Configuring services per namespace test"
+    envsubst < /root/workload/services_per_namespace.yaml.template > /tmp/services_per_namespace.yaml
+    workload_log "Done configuring services per namespace test"
+
+    workload_log "Running services per namespace workload"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${SERVICES_PER_NAMESPACE_TEST_PREFIX}
+      fi
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    workload_log "Completed services per namespace workload run"
+
+    workload_log "Checking Test Results"
+    workload_log "Checking Cluster Loader Exit Code"
+    if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
+      workload_log "Cluster Loader Failure"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Comparing services per namespace duration to expected duration"
+    workload_log "Services per namespace test Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ "$(jq '.duration>'${EXPECTED_SERVICES_PER_NAMESPACE_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
+      workload_log "EXPECTED_SERVICES_PER_NAMESPACE_DURATION (${EXPECTED_SERVICES_PER_NAMESPACE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"
+    # TODO: Check pbench-agent collected metrics for Pass/Fail
+    # TODO: Check prometheus collected metrics for Pass/Fail
+    workload_log "Test Analysis: Passed"
+  workload.sh: |
+    #!/bin/sh
+    set -o pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    start_time=$(date +%s)
+    VIPERCONFIG=/tmp/services_per_namespace.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    exit_code=$?
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+
+    workload_log "Writing Cluster Loader Exit Code"
+    jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
+    workload_log "Writing Cluster Loader Metrics to clusterloader.json"
+    grep "cluster_loader_marker" ${result_dir}/clusterloader.txt > "${result_dir}/clusterloader.json"
+
+    workload_log "Finished workload script"
+  services_per_namespace.yaml.template: |
+    provider: local
+    ClusterLoader:
+      cleanup: ${SERVICES_PER_NAMESPACE_CLEANUP}
+      projects:
+        - num: ${SERVICES_PER_NAMESPACE_PROJECTS}
+          basename: ${SERVICES_PER_NAMESPACE_BASENAME}
+          ifexists: delete
+          templates:
+            - num: ${SERVICES_PER_NAMESPACE_COUNT}
+              file: /root/workload/deployment-config-cluster-limits-services.yaml
+              parameters:
+                - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
+                - IMAGE: gcr.io/google-containers/pause-amd64:3.0
+  deployment-config-cluster-limits-services.yaml: |
+    ---
+    Kind: Template
+    apiVersion: v1
+    metadata:
+      name: deploymentConfigTemplate
+      creationTimestamp:
+      annotations:
+        description: This template will create a deploymentConfig with 1 replica, 4 env vars and a service.
+        tags: ''
+    objects:
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: deploymentconfig${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: replicationcontroller${IDENTIFIER}
+          spec:
+            containers:
+            - name: pause${IDENTIFIER}
+              image: "${IMAGE}"
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: ENVVAR1_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR2_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR3_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              - name: ENVVAR4_${IDENTIFIER}
+                value: "${ENV_VALUE}"
+              resources: {}
+              imagePullPolicy: IfNotPresent
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 1
+        selector:
+          name: replicationcontroller${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    - kind: Service
+      apiVersion: v1
+      metadata:
+        name: service${IDENTIFIER}
+      spec:
+        selector:
+          name: replicationcontroller${IDENTIFIER}
+        ports:
+        - name: serviceport${IDENTIFIER}
+          protocol: TCP
+          port: 80
+          targetPort: 8080
+        portalIP: ''
+        type: ClusterIP
+        sessionAffinity: None
+      status:
+        loadBalancer: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+      required: true
+    - name: IMAGE
+      description: Image to use for deploymentConfig
+      value: gcr.io/google-containers/pause-amd64:3.0
+      required: false
+    - name: ENV_VALUE
+      description: Value to use for environment variables
+      generate: expression
+      from: "[A-Za-z0-9]{255}"
+      required: false
+    labels:
+      template: deploymentConfigTemplate

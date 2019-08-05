@@ -80,4 +80,13 @@ data:
   NAMESPACES_PER_CLUSTER_BASENAME: "{{namespaces_per_cluster_basename}}"
   NAMESPACES_PER_CLUSTER_COUNT: "{{namespaces_per_cluster_count}}"
   EXPECTED_NAMESPACES_PER_CLUSTER_DURATION: "{{expected_namespaces_per_cluster_duration}}"
+{% elif workload_job == "services-per-namespace" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  SERVICES_PER_NAMESPACE_TEST_PREFIX: "{{services_per_namespace_test_prefix}}"
+  SERVICES_PER_NAMESPACE_CLEANUP: "{{services_per_namespace_cleanup}}"
+  SERVICES_PER_NAMESPACE_BASENAME: "{{services_per_namespace_basename}}"
+  SERVICES_PER_NAMESPACE_PROJECTS: "{{services_per_namespace_projects}}"
+  SERVICES_PER_NAMESPACE_COUNT: "{{services_per_namespace_count}}"
+  EXPECTED_SERVICES_PER_NAMESPACE_DURATION: "{{expected_services_per_namespace_duration}}"
 {% endif %}
