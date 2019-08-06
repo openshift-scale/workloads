@@ -1,0 +1,252 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    # pbench Configuration
+    echo "$(date -u) Configuring pbench for FIO I/O scale test"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "" > /var/lib/pbench-agent/tools-default/oc
+    echo "workload" > /var/lib/pbench-agent/tools-default/label
+    if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      echo "" > /var/lib/pbench-agent/tools-default/sar
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      # FIO test expect storage backend - get label for these nodes too
+      storage_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/storage= --no-headers | awk '{print $1}'`
+      for node in $storage_nodes; do 
+        echo "storage" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    echo "$(date -u) Done configuring pbench for FIO I/O scale test"
+    # End pbench Configuration
+    #
+    # Test Configuration
+    echo "$(date -u) Creating pods for FIO I/O scale test - pods will be in namespace:" {{ fiotest_basename }}0
+    pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods" -- 'VIPERCONFIG=/root/workload/fiotest.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    echo "$(date -u) Pods for FIO I/O test created."
+
+    # wait until all pods are started and then collect data
+    while [[ $(oc get pods -n {{ fiotest_basename }}0 | grep fiotest-pod | grep -c Run ) -lt {{ fiotest_maxpods }}  ]] ; do
+      sleep 10
+      echo "Waiting on pods to start..."
+    done
+    ## necessary for user diffrent than root
+    clients=`oc get pods --output=json -n {{ fiotest_basename }}0 | jq -r '[.items[].status.podIP] | join(",")'`
+    mv ~/.ssh/config ~/.ssh/config.bak || true
+    for host in $(echo "${clients}" | sed "s/,/ /g");
+    do
+      HOST=${host} envsubst < /root/workload/ssh_config.template >> ~/.ssh/config
+    done
+    cat ~/.ssh/config.bak >> ~/.ssh/config || true
+    chmod 0600 ~/.ssh/config
+    cp /root/workload/fiotest.sh /tmp/
+
+    # Execute fio test
+    /tmp/fiotest.sh
+    # todo: improve no-pbench test case
+    if [[ {{ enable_pbench_copy }} == "true" ]]; then
+      pbench-copy-results --prefix "{{ fiotest_prefix }}"-"{{ fiotest_maxpods }}"-"{{ fiotest_storageclass }}"
+    fi 
+    
+    if [[ {{ fiotest_cleanup }} == "true" ]]; then
+       oc delete project {{ fiotest_basename }}0
+       while [ "$(oc get project |grep {{ fiotest_basename }}0 | awk '{print $1}')" == {{ fiotest_basename }}0 ]; do
+         echo "waiting on project {{ fiotest_basename }}0 to disappear ..."
+         sleep 10
+       done
+       echo "Project {{ fiotest_basename }}0 is deleted ... test finished"
+    elif [[ {{ fiotest_cleanup }} == "false" ]]; then
+       echo "Test is done, but project {{ fiotest_basename }}0 is not be deleted due to FIOTEST_CLAENUP=false"
+    fi
+  fiotest.sh: |
+    #!/bin/bash
+    cp /root/.kube/config /tmp/config
+    export KUBECONFIG=/tmp/config
+    export CONFIG=/opt/pbench-agent/config/pbench-agent.cfg
+    # Not sure is this necessary - re-test
+    sed -i 's/\-o StrictHostKeyChecking=no/\-o StrictHostKeyChecking=no \-l default \-p 2022/g' /opt/pbench-agent/base
+    # to do - fix pbench-fio to support custom options
+    oc get pods -n {{ fiotest_basename }}0 -o wide | awk '{print $6}' |grep -v IP > /tmp/clients.txt
+    pbench-fio --test-types={{ fiotest_testtype }} --config="{{ fiotest_testtype }}-pods{{ fiotest_maxpods }}-storageclass-{{ fiotest_storageclass }}" \
+    --clients=$(cat /tmp/clients.txt | awk -vORS=, '{ print $1 }' | sed 's/,$/\n/') -b {{ fiotest_bs }} \
+    --samples {{ fiotest_samples }} --runtime {{ fiotest_runtime }}  --iodepth {{ fiotest_iodepth }} --direct {{ fiotest_direct }} \
+    --targets {{ fiotest_filename }} -s {{ fiotest_filesize }} 
+  fiotest.yml: |
+    provider: local
+    ClusterLoader:
+      projects:
+        - num: 1
+          basename: {{ fiotest_basename }}
+          ifexists: delete
+          nodeselector: {{ fiotest_nodeselector }} 
+          templates:
+            - num: 1
+              file: /root/workload/pbench-ssh.yaml
+              parameters:
+              - SSH_AUTHORIZED_KEYS: {{ fiotest_ssh_authorized_keys }}
+              - SSH_PRIVATE_KEY: {{ fiotest_ssh_private_key }}
+              - SSH_PUBLIC_KEY: {{ fiotest_ssh_public_key }}
+            - num: {{ fiotest_maxpods }}
+              file: fiotesttemplate.yaml
+              parameters:
+              - FIOTEST_CONTAINER_IMAGE: {{ fiotest_container_image }}
+              - FIO_SSH_PORT: {{ fio_ssh_port }}
+      tuningsets:
+        - name: default
+          pods:
+            stepping:
+              stepsize: {{ fiotest_stepsize }}
+              pause: {{ fiotest_pause }}
+            ratelimit:
+                delay: 0
+  fiotesttemplate.yaml: |
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: fio
+      annotations:
+        description: A template for creating an fio pod with PVC
+        tags: fio,perf
+    labels:
+      name: fiotest-test
+    objects:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "${PVC_NAME}"
+        annotations:
+          volume.beta.kubernetes.io/storage-class: {{ fiotest_storageclass }}
+      spec:
+        accessModes:
+         - {{ fiotest_access_modes }}
+        resources:
+          requests:
+            storage: {{ fiotest_storage_size }}
+    - apiVersion: v1
+      kind: ReplicationController
+      metadata:
+        labels:
+          name: fio
+        name: fiotest-pod-${IDENTIFIER}
+      spec:
+        replicas: 1
+        selector:
+          name: fio
+        template:
+          metadata:
+            labels:
+              name: fio
+            name: fio
+          spec:
+            hostNetwork: false
+            containers:
+              - name: "fio"
+                image: "{{ fiotest_container_image }}"
+                imagePullPolicy: IfNotPresent
+                env:
+                  - name: FIO_SSH_PORT
+                    value: "{{ fio_ssh_port }}"
+                securityContext: {}
+                volumeMounts:
+                  - name: pbench-ssh
+                    mountPath: /.ssh/authorized_keys
+                    subPath: authorized_keys
+                  - name: pbench-ssh
+                    mountPath: /root/.ssh/authorized_keys
+                    subPath: authorized_keys
+                  - name: pbench-results
+                    mountPath: /var/lib/pbench-agent
+                  - name: persistentvolume
+                    mountPath: "/mnt/pvcmount"
+            dnsPolicy: ClusterFirst
+            securityContext: {}
+            restartPolicy: Always
+            volumes:
+              - name: pbench-ssh
+                secret:
+                  secretName: pbench-ssh
+                  defaultMode: 0600
+              - name: pbench-results
+                emptyDir: {}
+              - name: persistentvolume
+                persistentVolumeClaim:
+                  claimName: "${PVC_NAME}"
+    parameters:
+    - name: PVC_NAME
+      description: PVC name
+      required: true
+      from: pvc[a-z0-9]{10}
+      generate: expression
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+    - name: FIO_SSH_PORT
+      description: What port should the sshd process in the fio container listen on
+      value: "2022"
+      required: true
+    - name: FIOTEST_CONTAINER_IMAGE
+      description: Which fio container image to be used in this pod
+      value: "quay.io/openshift-scale/scale-ci-fio"
+      required: true
+  pbench-ssh.yaml: |
+    kind: Template
+    apiVersion: v1
+    metadata:
+      name: sshSecretTemplate
+      creationTimestamp:
+      annotations:
+        description: Template to create ssh secret
+        tags: ''
+    objects:
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          name: pbench-ssh
+        type: Opaque
+        data:
+          authorized_keys: {{ fiotest_ssh_authorized_keys }}
+          id_rsa: {{ fiotest_ssh_private_key }}
+          id_rsa.pub: {{ fiotest_ssh_public_key }}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: "1"
+      required: true
+    - name: SSH_AUTHORIZED_KEYS
+      description: Authorized key file encoded for a secret
+      required: true
+    - name: SSH_PRIVATE_KEY
+      description: SSH private key 
+      required: true
+    - name: SSH_PUBLIC_KEY
+      description: SSH public key
+      required: true
+  ssh_config.template: |
+    Host ${HOST}
+    user default
+    port ${FIO_SSH_PORT}
+    StrictHostKeyChecking no
+    PasswordAuthentication no
+    UserKnownHostsFile /dev/null
+    IdentityFile ~/.ssh/id_rsa
