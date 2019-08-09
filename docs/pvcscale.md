@@ -115,10 +115,15 @@ This is default PVC size. If specified as `1Gi` then all Pods will get `1Gi` PVC
 Default: None  
 The storageclass which will be used to allocated PVCs. It has to be present on cluster and must be functional for test to work. Default is unset and must be changed prior running test and adapted to name of functional storage class name.
 
-### ACCESS_MODES
+### PVCSCALE_ACCESS_MODES
 Default: `ReadWriteOnce`  
-`ACCESS_MODES` is access_mode for PVC inside Pod. This field does not affect the test itself and might be removed in the future.
+`PVCSCALE_ACCESS_MODES` is access_mode for PVC inside Pod. This field does not affect the test itself and might be removed in the future.
 
+### PVCSCALE_NODESELECTOR
+
+Default: None
+If there is need for Pods to start on specific nodes based on node selector this parameter will ensure that Pods
+are starting on nodes with desired labels. It is prerequst that nodes are labeled with proper labels. 
 ### Smoke test variables
 
 ```
