@@ -16,6 +16,7 @@
 | [Conformance](conformance.md)                      | OCP/Kubernetes e2e tests                  | None                                  |
 | [Namespaces per cluster](namespaces-per-cluster.md) | Maximum Namespaces                       | None                                  |
 | [Services per namespace](services-per-namespace.md) | Maximum services per namespace           | None                                  |
+| [FIO I/O test](fio.md)                              | FIO I/O test - stress storage backend    | Privileged Containers, Working storage class |
 
 * Baseline job without a tooled cluster just idles a cluster.  The goal is to capture resource consumption over a period of time to characterize resource requirements thus tooling is required. (For now)
 
@@ -47,3 +48,4 @@ Each workload will implement a form of pass/fail criteria in order to flag if th
 | [Conformance](conformance.md)                      | No                            |
 | [Namespaces per cluster](namespaces-per-cluster.md) | Yes: Exit code, Test Duration |
 | [Services per namespace](services-per-namespace.md) | Yes: Exit code, Test Duration |
+| [FIO I/O test](fio.md)                              | No                            |

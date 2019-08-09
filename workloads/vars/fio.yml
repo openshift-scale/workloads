@@ -1,0 +1,53 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# RHCOS fiotest workload variables.
+###############################################################################
+
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default('', true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(true, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(false, false)|bool }}"
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+enable_pbench_copy: "{{ lookup('env', 'ENABLE_PBENCH_COPY')|default(true, true)|bool|lower }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(10000, true)|int }}"
+
+# FIO IO test workload specific parameters:
+fiotest_prefix: "{{ lookup('env', 'FIOTEST_PREFIX')|default('fiotest', true) }}"
+fiotest_cleanup: "{{ lookup('env', 'FIOTEST_CLEANUP')|default(true, true)|bool|lower }}"
+fiotest_basename: "{{ lookup('env', 'FIOTEST_BASENAME')|default('fiotest', true) }}"
+fiotest_maxpods: "{{ lookup('env', 'FIOTEST_MAXPODS')|default(1, true)|int }}"
+fiotest_container_image: "{{ lookup('env', 'FIOTEST_CONTAINER_IMAGE')|default('quay.io/openshift-scale/scale-ci-fio', true) }}"
+fiotest_stepsize: "{{ lookup('env', 'FIOTEST_STEPSIZE')|default(1, true)|int }}"
+fiotest_pause: "{{ lookup('env', 'FIOTEST_PAUSE')|default(0, true)|int }}"
+fiotest_storage_size: "{{ lookup('env', 'FIOTEST_STORAGE_SIZE')|default('2Gi',true) }}"
+fiotest_storageclass: "{{ lookup('env', 'FIOTEST_STORAGECLASS')|default('', true) }}"
+fiotest_access_modes: "{{ lookup('env', 'FIOTEST_ACCESS_MODES')|default('ReadWriteOnce', true) }}"
+fiotest_bs: "{{ lookup('env', 'FIOTEST_BS')|default(4, true)|int }}"
+fiotest_filename: "{{ lookup('env', 'FIOTEST_FILENAME')|default('/mnt/pvcmount/f2', true) }}"
+fiotest_filesize: "{{ lookup('env', 'FIOTEST_FILESIZE')|default('1GB', true) }}"
+fiotest_runtime: "{{ lookup('env', 'FIOTEST_RUNTIME')|default(600, true)|int }}"
+fiotest_direct: "{{ lookup('env', 'FIOTEST_DIRECT')|default(1, true)|int }}" 
+fiotest_iodepth: "{{ lookup('env', 'FIOTEST_IODEPTH')|default(1, true)|int }}" 
+fiotest_testtype: "{{ lookup('env', 'FIOTEST_TESTTYPE')|default('write', true) }}" 
+fiotest_samples: "{{ lookup('env', 'FIOTEST_SAMPLES')|default(1, true)|int }}"
+fiotest_nodeselector: "{{ lookup('env', 'FIOTEST_NODESELECTOR')|default('', true) }}"
+fio_ssh_port: "{{ lookup('env', 'FIO_SSH_PORT')|default(2022, true)|int }}"
+fiotest_ssh_authorized_keys: "{{pbench_ssh_public_key_file_slurp['content']}}"
+fiotest_ssh_private_key: "{{pbench_ssh_private_key_file_slurp['content']}}"
+fiotest_ssh_public_key: "{{pbench_ssh_public_key_file_slurp['content']}}"

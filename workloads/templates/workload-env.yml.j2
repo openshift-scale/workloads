@@ -89,4 +89,10 @@ data:
   SERVICES_PER_NAMESPACE_PROJECTS: "{{services_per_namespace_projects}}"
   SERVICES_PER_NAMESPACE_COUNT: "{{services_per_namespace_count}}"
   EXPECTED_SERVICES_PER_NAMESPACE_DURATION: "{{expected_services_per_namespace_duration}}"
+{% elif workload_job == "storage-fio" %}
+  FIOTEST_CONTAINER_IMAGE: "{{fiotest_container_image}}"
+  FIO_SSH_PORT: "{{fio_ssh_port}}"
+  FIOTEST_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
+  FIOTEST_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
+  FIOTEST_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
 {% endif %}
