@@ -283,6 +283,7 @@ data:
           basename: {{ pvcscale_basename }}
           tuning: default
           ifexists: delete
+          nodeselector: {{ pvcscale_nodeselector }}
           templates:
             - num: {{ pvcscale_maxpods }}
               basename: pvcscale
@@ -314,7 +315,7 @@ data:
           volume.beta.kubernetes.io/storage-class: {{ pvcscale_storageclass }}
       spec:
         accessModes:
-         - {{ access_modes }}
+         - {{ pvcscale_access_modes }}
         resources:
           requests:
             storage: {{ pvcscale_storage_size }}
