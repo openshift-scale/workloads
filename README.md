@@ -2,6 +2,10 @@
 
 Tool an OpenShift cluster and run OpenShift Performance and Scale Workloads.
 
+## Documentation, Usage and Examples
+
+[See docs directory](docs/)
+
 ## Usage
 
 1. Git clone the repo
@@ -46,7 +50,3 @@ oc get job -n scale-ci-tooling scale-ci-nodevertical -o json | jq -e '.status.su
 ```
 
 For Pass/Fail functionality, jobs will not have a succeeded status and thus have failed in CI due to the last statement in the above build job.
-
-## More Docs
-
-[See docs directory](docs/)

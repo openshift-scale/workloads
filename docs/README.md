@@ -28,6 +28,10 @@
 | Pod to Pod with HostNetwork | Labeling Nodes, Open firewall ports at Host |
 | Pod to Service              | Labeling Nodes                              |
 
+## Workload Contributing Guidelines
+
+[See this page for workload contributing guidelines.](workload_guidelines.md)
+
 ## CI Pass/Fail
 
 Each workload will implement a form of pass/fail criteria in order to flag if the tests have failed in CI.
