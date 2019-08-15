@@ -68,29 +68,55 @@ data:
     workload_log "Test Analysis: Passed"
   workload.sh: |
     #!/bin/sh
-    set -eo pipefail
 
     result_dir=/tmp
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       result_dir=${benchmark_results_dir}
     fi
-    cluster_name=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "'${SCALE_METADATA_PREFIX}'/cluster-api-cluster")}}')
-    cluster_region=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index .items 0 ).spec.template.spec.providerSpec.value.placement.region }}')
-
-    az_a_count=$(((${SCALE_WORKER_COUNT}+3)/4))
-    az_b_count=$(((${SCALE_WORKER_COUNT}+2)/4))
-    az_c_count=$(((${SCALE_WORKER_COUNT}+1)/4))
-    az_d_count=$((${SCALE_WORKER_COUNT}/4))
+    machinesets=$(oc get machineset -n openshift-machine-api | egrep "\-worker\-|\-w\-" | awk '{print $1}')
+    IFS=$'\n' read -rd '' -a ms_arr <<<"$machinesets"
 
     start_time=$(date +%s)
-    workload_log "Scaling ${cluster_region}a to ${az_a_count}"
-    oc patch machineset ${cluster_name}-worker-${cluster_region}a --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
-    workload_log "Scaling ${cluster_region}b to ${az_b_count}"
-    oc patch machineset ${cluster_name}-worker-${cluster_region}b --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
-    workload_log "Scaling ${cluster_region}c to ${az_c_count}"
-    oc patch machineset ${cluster_name}-worker-${cluster_region}c --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_c_count}' }}'
-    workload_log "Scaling ${cluster_region}d to ${az_d_count}"
-    oc patch machineset ${cluster_name}-worker-${cluster_region}d --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_d_count}' }}'
+    if [ "${#ms_arr[@]}" == "1" ]; then
+      workload_log "Scaling ${ms_arr[0]} to ${SCALE_WORKER_COUNT}"
+      oc patch machineset ${ms_arr[0]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${SCALE_WORKER_COUNT}' }}'
+    elif [ "${#ms_arr[@]}" == "2" ]; then
+      az_a_count=$(((${SCALE_WORKER_COUNT}+1)/2))
+      az_b_count=$(((${SCALE_WORKER_COUNT})/2))
+
+      workload_log "Scaling ${ms_arr[0]} to ${az_a_count}"
+      oc patch machineset ${ms_arr[0]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
+      workload_log "Scaling ${ms_arr[1]} to ${az_b_count}"
+      oc patch machineset ${ms_arr[1]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
+    elif [ "${#ms_arr[@]}" == "3" ]; then
+      az_a_count=$(((${SCALE_WORKER_COUNT}+2)/3))
+      az_b_count=$(((${SCALE_WORKER_COUNT}+1)/3))
+      az_c_count=$((${SCALE_WORKER_COUNT}/3))
+
+      workload_log "Scaling ${ms_arr[0]} to ${az_a_count}"
+      oc patch machineset ${ms_arr[0]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
+      workload_log "Scaling ${ms_arr[1]} to ${az_b_count}"
+      oc patch machineset ${ms_arr[1]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
+      workload_log "Scaling ${ms_arr[2]} to ${az_c_count}"
+      oc patch machineset ${ms_arr[2]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_c_count}' }}'
+    elif [ "${#ms_arr[@]}" == "4" ]; then
+      az_a_count=$(((${SCALE_WORKER_COUNT}+3)/4))
+      az_b_count=$(((${SCALE_WORKER_COUNT}+2)/4))
+      az_c_count=$(((${SCALE_WORKER_COUNT}+1)/4))
+      az_d_count=$((${SCALE_WORKER_COUNT}/4))
+
+      workload_log "Scaling ${ms_arr[0]} to ${az_a_count}"
+      oc patch machineset ${ms_arr[0]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_a_count}' }}'
+      workload_log "Scaling ${ms_arr[1]} to ${az_b_count}"
+      oc patch machineset ${ms_arr[1]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_b_count}' }}'
+      workload_log "Scaling ${ms_arr[2]} to ${az_c_count}"
+      oc patch machineset ${ms_arr[2]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_c_count}' }}'
+      workload_log "Scaling ${ms_arr[3]} to ${az_d_count}"
+      oc patch machineset ${ms_arr[3]} --type=merge -n openshift-machine-api -p '{"spec": {"replicas": '${az_d_count}' }}'
+    else
+      workload_log "Unhandled number of machinesets: ${#ms_arr[@]}"
+      exit 1
+    fi
 
     retries=0
     while [ ${retries} -le ${SCALE_POLL_ATTEMPTS} ] ; do

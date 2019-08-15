@@ -2,7 +2,7 @@
 
 The scale workload playbook is `workloads/scale.yml` and will scale a cluster with or without tooling.
 
-The scale workload can scale a cluster both with more or less worker nodes provisioned across the 4 availability zones.  If scaling down it is best to use the workload node to host the workload job as the nodes chosen to host the workload Pod could also be a node that is removed.
+The scale workload can scale a cluster both with more or less worker nodes provisioned across 1-4 availability zones.  If scaling down it is best to use the workload node to host the workload job as the nodes chosen to host the workload Pod could also be a node that is removed.
 
 Running from CLI:
 
