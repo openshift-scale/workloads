@@ -1,0 +1,37 @@
+---
+###############################################################################
+# Ansible SSH variables.
+###############################################################################
+ansible_public_key_file: "{{ lookup('env', 'PUBLIC_KEY')|default('~/.ssh/id_rsa.pub', true) }}"
+ansible_private_key_file: "{{ lookup('env', 'PRIVATE_KEY')|default('~/.ssh/id_rsa', true) }}"
+
+orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true) }}"
+###############################################################################
+# Prometheus scale workload variables.
+###############################################################################
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(false, true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(false, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(false, true)|bool }}"
+
+kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
+
+# pbench variables
+pbench_instrumentation: "{{ lookup('env', 'PBENCH_INSTRUMENTATION')|default(false, true)|bool|lower }}"
+enable_pbench_agents: "{{ lookup('env', 'ENABLE_PBENCH_AGENTS')|default(false, true)|bool }}"
+enable_pbench_copy: "{{ lookup('env', 'ENABLE_PBENCH_COPY')|default(false, true)|bool|lower }}"
+pbench_ssh_private_key_file: "{{ lookup('env', 'PBENCH_SSH_PRIVATE_KEY_FILE')|default('~/.ssh/id_rsa', true) }}"
+pbench_ssh_public_key_file: "{{ lookup('env', 'PBENCH_SSH_PUBLIC_KEY_FILE')|default('~/.ssh/id_rsa.pub', true) }}"
+pbench_server: "{{ lookup('env', 'PBENCH_SERVER')|default('', true) }}"
+
+# Other variables for workload tests
+scale_ci_results_token: "{{ lookup('env', 'SCALE_CI_RESULTS_TOKEN')|default('', true) }}"
+job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|default(360, true)|int }}"
+
+# Prometheus scale workload specific parameters:
+prometheus_scale_test_prefix: "{{ lookup('env', 'PROMETHEUS_SCALE_TEST_PREFIX')|default('prometheus-scale', true) }}"
+prometheus_concurrency: "{{ lookup('env', 'PROMETHEUS_CONCURRENCY')|default(10, true)|int }}"
+prometheus_duration: "{{ lookup('env', 'PROMETHEUS_DURATION')|default(9000, true)|int }}"
+prometheus_graph_period: "{{ lookup('env', 'PROMETHEUS_GRAPH_PERIOD')|default(15, true)|int }}"
+prometheus_refresh_interval: "{{ lookup('env', 'PROMETHEUS_REFRESH_INTERVAL')|default(20, true)|int }}"

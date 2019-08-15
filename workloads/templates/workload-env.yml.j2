@@ -95,4 +95,12 @@ data:
   FIOTEST_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
   FIOTEST_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
   FIOTEST_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
+{% elif workload_job == "prometheus-scale" %}
+  PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
+  ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
+  PROMETHEUS_CONCURRENCY: "{{prometheus_concurrency}}"
+  PROMETHEUS_DURATION: "{{prometheus_duration}}"
+  PROMETHEUS_GRAPH_PERIOD: "{{prometheus_graph_period}}"
+  PROMETHEUS_REFRESH_INTERVAL: "{{prometheus_refresh_interval}}"
+  PROMETHEUS_SCALE_TEST_PREFIX: "{{prometheus_scale_test_prefix}}"
 {% endif %}

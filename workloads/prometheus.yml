@@ -1,0 +1,131 @@
+---
+#
+# Runs Prometheus scale test
+#
+
+- name: Runs Prometheus sclae test on a RHCOS cluster
+  hosts: orchestration
+  gather_facts: true
+  remote_user: "{{orchestration_user}}"
+  vars_files:
+    - vars/prometheus.yml
+  vars:
+    workload_job: "prometheus-scale"
+  tasks:
+    - name: Create scale-ci-tooling directory
+      file:
+        path: "{{ansible_user_dir}}/scale-ci-tooling"
+        state: directory
+
+    - name: Copy workload files
+      copy:
+        src: "{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - src: scale-ci-tooling-ns.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
+        - src: workload-prometheus-script-cm.yml
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-script-cm.yml"
+
+    - name: Slurp kubeconfig file
+      slurp:
+        src: "{{kubeconfig_file}}"
+      register: kubeconfig_file_slurp
+
+    - name: Slurp ssh private key file
+      slurp:
+        src: "{{pbench_ssh_private_key_file}}"
+      register: pbench_ssh_private_key_file_slurp
+
+    - name: Slurp ssh public key file
+      slurp:
+        src: "{{pbench_ssh_public_key_file}}"
+      register: pbench_ssh_public_key_file_slurp
+
+    - name: Template workload templates
+      template:
+        src: "{{item.src}}"
+        dest: "{{item.dest}}"
+      with_items:
+        - src: pbench-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-cm.yml"
+        - src: pbench-ssh-secret.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-ssh-secret.yml"
+        - src: kubeconfig-secret.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
+        - src: workload-job.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
+        - src: workload-env.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-env.yml"
+
+    - name: Check if scale-ci-tooling namespace exists
+      shell: |
+        oc get project scale-ci-tooling
+      ignore_errors: true
+      changed_when: false
+      register: scale_ci_tooling_ns_exists
+
+    - name: Ensure any stale scale-ci-prometheus job is deleted
+      shell: |
+        oc delete job scale-ci-prometheus -n scale-ci-tooling
+      register: scale_ci_tooling_project
+      failed_when: scale_ci_tooling_project.rc == 0
+      until: scale_ci_tooling_project.rc == 1
+      retries: 60
+      delay: 1
+      when: scale_ci_tooling_ns_exists.rc == 0
+
+    - name: Block for non-existing tooling namespace
+      block:
+        - name: Create tooling namespace
+          shell: |
+            oc create -f {{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml
+
+        - name: Create tooling service account
+          shell: |
+            oc create serviceaccount useroot -n scale-ci-tooling
+            oc adm policy add-scc-to-user privileged -z useroot -n scale-ci-tooling
+          when: enable_pbench_agents|bool
+      when: scale_ci_tooling_ns_exists.rc != 0
+
+    - name: Create/replace kubeconfig secret
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/kubeconfig-secret.yml"
+
+    - name: Create/replace the pbench configmap
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-cm.yml"
+
+    - name: Create/replace pbench ssh secret
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/pbench-ssh-secret.yml"
+
+    - name: Create/replace workload script configmap
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-script-cm.yml"
+
+    - name: Create/replace workload script environment configmap
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-env.yml"
+
+    - name: Create/replace workload job to that runs workload script
+      shell: |
+        oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
+
+    - name: Poll until job pod is running
+      shell: |
+        oc get pods --selector=job-name=scale-ci-prometheus-scale -n scale-ci-tooling -o json
+      register: pod_json
+      retries: 60
+      delay: 2
+      until: pod_json.stdout | from_json | json_query('items[0].status.phase==`Running`')
+
+    - name: Poll until job is complete
+      shell: |
+        oc get job scale-ci-prometheus-scale -n scale-ci-tooling -o json
+      register: job_json
+      retries: "{{job_completion_poll_attempts}}"
+      delay: 10
+      until: job_json.stdout | from_json | json_query('status.succeeded==`1` || status.failed==`1`')
+      failed_when: job_json.stdout | from_json | json_query('status.succeeded==`1`') == false
+      when: job_completion_poll_attempts|int > 0
