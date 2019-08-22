@@ -431,11 +431,12 @@ data:
       # a regular pbench run
       if test "${PBENCH_SCRAPER_USE}" = true ; then
         pbench-user-benchmark \
+          --sysinfo=none \
           -C "$benchmark_test_config" \
           --pbench-post='/usr/local/bin/pbscraper -i $benchmark_results_dir/tools-default -o $benchmark_results_dir; ansible-playbook -vv -i /root/svt/utils/pbwedge/hosts /root/svt/utils/pbwedge/main.yml -e new_file=$benchmark_results_dir/out.json -e git_test_branch='http_$benchmark_test_config \
           -- $wlg_run_pbench
       else
-        pbench-user-benchmark -C "$benchmark_test_config" -- $wlg_run_pbench
+        pbench-user-benchmark --sysinfo=none -C "$benchmark_test_config" -- $wlg_run_pbench
       fi
     }
 
