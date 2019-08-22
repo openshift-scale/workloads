@@ -122,7 +122,7 @@ workload_log "Running Example workload"
 if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
   # (3i) Invoke with pbench-user-benchmark
   pbench-user-benchmark -- sh /root/workload/workload.sh
-  result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -2 | tail -1)"/1/sample1
+  result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -1)"/1/sample1
   if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
     pbench-copy-results --prefix ${EXAMPLE_TEST_PREFIX}
   fi
