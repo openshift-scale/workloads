@@ -84,6 +84,7 @@ data:
     cp /root/.kube/config /tmp/config
     export KUBECONFIG=/tmp/config
     export CONFIG=/opt/pbench-agent/config/pbench-agent.cfg
+    source /opt/pbench-agent/profile
     # Not sure is this necessary - re-test
     sed -i 's/\-o StrictHostKeyChecking=no/\-o StrictHostKeyChecking=no \-l default \-p 2022/g' /opt/pbench-agent/base
     # to do - fix pbench-fio to support custom options
