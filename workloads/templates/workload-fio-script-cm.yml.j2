@@ -43,7 +43,7 @@ data:
     #
     # Test Configuration
     echo "$(date -u) Creating pods for FIO I/O scale test - pods will be in namespace:" {{ fiotest_basename }}0
-    pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods" -- 'VIPERCONFIG=/root/workload/fiotest.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods-{{ fiotest_description }}" -- 'VIPERCONFIG=/root/workload/fiotest.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     echo "$(date -u) Pods for FIO I/O test created."
 
     # wait until all pods are started and then collect data
@@ -89,7 +89,7 @@ data:
     sed -i 's/\-o StrictHostKeyChecking=no/\-o StrictHostKeyChecking=no \-l default \-p 2022/g' /opt/pbench-agent/base
     # to do - fix pbench-fio to support custom options
     oc get pods -n {{ fiotest_basename }}0 -o wide | awk '{print $6}' |grep -v IP > /tmp/clients.txt
-    pbench-fio --test-types={{ fiotest_testtype }} --config="{{ fiotest_testtype }}-pods{{ fiotest_maxpods }}-storageclass-{{ fiotest_storageclass }}" \
+    pbench-fio --test-types={{ fiotest_testtype }} --config="{{ fiotest_testtype }}-pods{{ fiotest_maxpods }}-storageclass-{{ fiotest_storageclass }}-{{ fiotest_description }}" \
     --clients=$(cat /tmp/clients.txt | awk -vORS=, '{ print $1 }' | sed 's/,$/\n/') -b {{ fiotest_bs }} \
     --samples {{ fiotest_samples }} --runtime {{ fiotest_runtime }}  --iodepth {{ fiotest_iodepth }} --direct {{ fiotest_direct }} \
     --targets {{ fiotest_filename }} -s {{ fiotest_filesize }} 
