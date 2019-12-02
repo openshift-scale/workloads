@@ -23,6 +23,18 @@ $ time ansible-playbook -vv -i inventory workloads/pvcscale.yml
 
 ## Environment variables
 
+### ES_HOST
+Default: ``
+Elasticsearch server host address (currently used by snafu), set to index results from cluster loader
+
+### ES_PORT
+Default: ``
+Elasticsearch server port (currently used by snafu), set to index results from cluster loader
+
+### ES_INDEX_PREFIX
+Default: `snafu`
+Elasticsearch server index prefix (currently used by snafu)
+
 ### PUBLIC_KEY
 Default: `~/.ssh/id_rsa.pub`  
 Public ssh key file for Ansible.
@@ -131,7 +143,7 @@ Default: `ReadWriteOnce`
 
 Default: None
 If there is need for Pods to start on specific nodes based on node selector this parameter will ensure that Pods
-are starting on nodes with desired labels. It is prerequst that nodes are labeled with proper labels. 
+are starting on nodes with desired labels. It is prerequst that nodes are labeled with proper labels.
 ### Smoke test variables
 
 ```

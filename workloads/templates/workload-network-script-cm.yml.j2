@@ -68,7 +68,10 @@ data:
       if [[ "${AZURE_AUTH}" == "true" ]]; then
         export AZURE_AUTH_LOCATION=/tmp/azure_auth
       fi
-      VIPERCONFIG=/tmp/network.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"
+      export es={{ snafu_es_host }}
+      export es_port={{ snafu_es_port }}
+      export es_index={{ snafu_es_index_prefix }}
+      VIPERCONFIG=/tmp/network.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests
 
       # Check if clients and servers are ready
       for rc_num in `seq 0 $((${pair_count} - 1))`

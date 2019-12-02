@@ -13,6 +13,18 @@ $ time ansible-playbook -vv -i inventory workloads/cluster-limits-deployments-pe
 
 ## Environment variables
 
+### ES_HOST
+Default: ``
+Elasticsearch server host address (currently used by snafu), set to index results from cluster loader
+
+### ES_PORT
+Default: ``
+Elasticsearch server port (currently used by snafu), set to index results from cluster loader
+
+### ES_INDEX_PREFIX
+Default: `snafu`
+Elasticsearch server index prefix (currently used by snafu)
+
 ### PUBLIC_KEY
 Default: `~/.ssh/id_rsa.pub`  
 Public ssh key file for Ansible.

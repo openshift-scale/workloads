@@ -33,7 +33,7 @@ data:
       done
       # FIO test expect storage backend - get label for these nodes too
       storage_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/storage= --no-headers | awk '{print $1}'`
-      for node in $storage_nodes; do 
+      for node in $storage_nodes; do
         echo "storage" > /var/lib/pbench-agent/tools-default/remote@$node
       done
     fi
@@ -46,7 +46,11 @@ data:
       export AZURE_AUTH_LOCATION=/tmp/azure_auth
     fi
     echo "$(date -u) Creating pods for FIO I/O scale test - pods will be in namespace:" {{ fiotest_basename }}0
-    pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods-{{ fiotest_description }}" -- 'VIPERCONFIG=/root/workload/fiotest.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
+    mkdir -p /tmp/snafu_results
+    export es={{ snafu_es_host }}
+    export es_port={{ snafu_es_port }}
+    export es_index={{ snafu_es_index_prefix }}
+    pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods-{{ fiotest_description }}" -- 'VIPERCONFIG=/root/workload/fiotest.yml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir /tmp/snafu_results -p openshift-tests'
     echo "$(date -u) Pods for FIO I/O test created."
 
     # wait until all pods are started and then collect data
@@ -70,8 +74,8 @@ data:
     # todo: improve no-pbench test case
     if [[ {{ enable_pbench_copy }} == "true" ]]; then
       pbench-copy-results --prefix "{{ fiotest_prefix }}"-"{{ fiotest_maxpods }}"-"{{ fiotest_storageclass }}"
-    fi 
-    
+    fi
+
     if [[ {{ fiotest_cleanup }} == "true" ]]; then
        oc delete project {{ fiotest_basename }}0
        while [ "$(oc get project |grep {{ fiotest_basename }}0 | awk '{print $1}')" == {{ fiotest_basename }}0 ]; do
@@ -95,7 +99,7 @@ data:
     pbench-fio --test-types={{ fiotest_testtype }} --config="{{ fiotest_testtype }}-pods{{ fiotest_maxpods }}-storageclass-{{ fiotest_storageclass }}-{{ fiotest_description }}" \
     --clients=$(cat /tmp/clients.txt | awk -vORS=, '{ print $1 }' | sed 's/,$/\n/') -b {{ fiotest_bs }} \
     --samples {{ fiotest_samples }} --runtime {{ fiotest_runtime }}  --iodepth {{ fiotest_iodepth }} --direct {{ fiotest_direct }} \
-    --targets {{ fiotest_filename }} -s {{ fiotest_filesize }} 
+    --targets {{ fiotest_filename }} -s {{ fiotest_filesize }}
   fiotest.yml: |
     provider: local
     ClusterLoader:
@@ -103,7 +107,7 @@ data:
         - num: 1
           basename: {{ fiotest_basename }}
           ifexists: delete
-          nodeselector: {{ fiotest_nodeselector }} 
+          nodeselector: {{ fiotest_nodeselector }}
           templates:
             - num: 1
               file: /root/workload/pbench-ssh.yaml
@@ -241,7 +245,7 @@ data:
       description: Authorized key file encoded for a secret
       required: true
     - name: SSH_PRIVATE_KEY
-      description: SSH private key 
+      description: SSH private key
       required: true
     - name: SSH_PUBLIC_KEY
       description: SSH public key

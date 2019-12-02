@@ -24,8 +24,6 @@
       with_items:
         - src: scale-ci-tooling-ns.yml
           dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
-        - src: workload-nodevertical-script-cm.yml
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
 
     - name: Slurp kubeconfig file
       slurp:
@@ -41,7 +39,7 @@
       slurp:
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
-    
+
     - name: Remove nodevertical label from nodes
       shell: |
         oc label nodes -l nodevertical=true nodevertical-
@@ -93,6 +91,9 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-env.yml"
+        - src: workload-nodevertical-script-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
+
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |
@@ -152,7 +153,7 @@
     - name: Create/replace workload job to that runs workload script
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
-    
+
     - name: Poll until job pod is running
       shell: |
         oc get pods --selector=job-name=scale-ci-nodevertical -n scale-ci-tooling -o json

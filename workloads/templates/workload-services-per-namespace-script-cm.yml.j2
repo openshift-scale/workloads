@@ -8,7 +8,7 @@ data:
     set -eo pipefail
     workload_log() { echo "$(date -u) $@" >&2; }
     export -f workload_log
-    workload_log "Configuring pbench for Namespaces per cluster test"
+    workload_log "Configuring pbench for services per namespace test"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     if [[ -v ENABLE_PBENCH_AGENTS ]]; then
@@ -34,24 +34,24 @@ data:
       done
     fi
     source /opt/pbench-agent/profile
-    workload_log "Done configuring pbench for Namespaces per cluster test"
+    workload_log "Done configuring pbench for services per namespace test"
 
-    workload_log "Configuring Namespaces per cluster test"
-    envsubst < /root/workload/namespaces_per_cluster.yaml.template > /tmp/namespaces_per_cluster.yaml
-    workload_log "Done configuring Namespaces per cluster test"
+    workload_log "Configuring services per namespace test"
+    envsubst < /root/workload/services_per_namespace.yaml.template > /tmp/services_per_namespace.yaml
+    workload_log "Done configuring services per namespace test"
 
-    workload_log "Running Namespaces per cluster workload"
+    workload_log "Running services per namespace workload"
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       pbench-user-benchmark -- sh /root/workload/workload.sh
       result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -1)"/1/sample1
       if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
-        pbench-copy-results --prefix ${NAMESPACES_PER_CLUSTER_TEST_PREFIX}
+        pbench-copy-results --prefix ${SERVICES_PER_NAMESPACE_TEST_PREFIX}
       fi
     else
       sh /root/workload/workload.sh
       result_dir=/tmp
     fi
-    workload_log "Completed Namespaces per cluster workload run"
+    workload_log "Completed services per namespace workload run"
 
     workload_log "Checking Test Results"
     workload_log "Checking Cluster Loader Exit Code"
@@ -60,10 +60,10 @@ data:
       workload_log "Test Analysis: Failed"
       exit 1
     fi
-    workload_log "Comparing Namespaces per cluster duration to expected duration"
-    workload_log "Namespaces per cluster test Duration: $(jq '.duration' ${result_dir}/exit.json)"
-    if [ "$(jq '.duration>'${EXPECTED_NAMESPACES_PER_CLUSTER_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
-      workload_log "EXPECTED_NAMESPACES_PER_CLUSTER_DURATION (${EXPECTED_NAMESPACES_PER_CLUSTER_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+    workload_log "Comparing services per namespace duration to expected duration"
+    workload_log "Services per namespace test Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ "$(jq '.duration>'${EXPECTED_SERVICES_PER_NAMESPACE_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
+      workload_log "EXPECTED_SERVICES_PER_NAMESPACE_DURATION (${EXPECTED_SERVICES_PER_NAMESPACE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
       workload_log "Test Analysis: Failed"
       exit 1
     fi
@@ -83,7 +83,10 @@ data:
       export AZURE_AUTH_LOCATION=/tmp/azure_auth
     fi
     start_time=$(date +%s)
-    VIPERCONFIG=/tmp/namespaces_per_cluster.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    export es={{ snafu_es_host }}
+    export es_port={{ snafu_es_port }}
+    export es_index={{ snafu_es_index_prefix }}
+    VIPERCONFIG=/tmp/services_per_namespace.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests | tee "${result_dir}/clusterloader.txt"
     exit_code=$?
     end_time=$(date +%s)
     duration=$((end_time-start_time))
@@ -94,57 +97,21 @@ data:
     grep "cluster_loader_marker" ${result_dir}/clusterloader.txt > "${result_dir}/clusterloader.json"
 
     workload_log "Finished workload script"
-  namespaces_per_cluster.yaml.template: |
+  services_per_namespace.yaml.template: |
     provider: local
     ClusterLoader:
-      cleanup: ${NAMESPACES_PER_CLUSTER_CLEANUP}
+      cleanup: ${SERVICES_PER_NAMESPACE_CLEANUP}
       projects:
-        - num: ${NAMESPACES_PER_CLUSTER_COUNT}
-          basename: ${NAMESPACES_PER_CLUSTER_BASENAME}
-          ifexists: reuse
+        - num: ${SERVICES_PER_NAMESPACE_PROJECTS}
+          basename: ${SERVICES_PER_NAMESPACE_BASENAME}
+          ifexists: delete
           templates:
-            - num: 1
-              file: /root/workload/bc-imagestream-template.yaml
-            - num: 1
-              file: /root/workload/deployment-config-ns-per-cluster-template.yaml
+            - num: ${SERVICES_PER_NAMESPACE_COUNT}
+              file: /root/workload/deployment-config-cluster-limits-services.yaml
               parameters:
                 - ENV_VALUE: "asodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij0emc2oed2ed2ed2e2easodfn209e8j0eij12"
-            - num: 10
-              file: /root/workload/ssh-secret-template.yaml
-  bc-imagestream-template.yaml: |
-    ---
-    Kind: Template
-    apiVersion: v1
-    metadata:
-      name: imagestreamTemplate
-      creationTimestamp:
-      annotations:
-        description: This template will create two imageStreams.
-        tags: ''
-    objects:
-    - apiVersion: v1
-      kind: ImageStream
-      metadata:
-        name: bc-imagestream-src${IDENTIFIER}
-      spec:
-        dockerImageRepository: "${IMAGE}"
-    - apiVersion: v1
-      kind: ImageStream
-      metadata:
-        name: bc-imagestream-dest${IDENTIFIER}
-      spec: {}
-    parameters:
-    - name: IDENTIFIER
-      description: Number to append to the name of resources
-      value: '1'
-      required: true
-    - name: IMAGE
-      description: Image to use for this image stream
-      value: quay.io/openshift-scale/mastervertical-build
-      required: false
-    labels:
-      template: imagestreamTemplate
-  deployment-config-ns-per-cluster-template.yaml: |
+                - IMAGE: gcr.io/google-containers/pause-amd64:3.0
+  deployment-config-cluster-limits-services.yaml: |
     ---
     Kind: Template
     apiVersion: v1
@@ -152,8 +119,7 @@ data:
       name: deploymentConfigTemplate
       creationTimestamp:
       annotations:
-        description: This template will create a deploymentConfig with 6 replica, 4 env vars and a service.
-          vars, and a service.
+        description: This template will create a deploymentConfig with 1 replica, 4 env vars and a service.
         tags: ''
     objects:
     - kind: DeploymentConfig
@@ -189,7 +155,7 @@ data:
                 privileged: false
             restartPolicy: Always
             serviceAccount: ''
-        replicas: 6
+        replicas: 1
         selector:
           name: replicationcontroller${IDENTIFIER}
         triggers:
@@ -229,28 +195,3 @@ data:
       required: false
     labels:
       template: deploymentConfigTemplate
-  ssh-secret-template.yaml: |
-   ---
-    Kind: Template
-    apiVersion: v1
-    metadata:
-      name: sshSecretTemplate
-      creationTimestamp: 
-      annotations:
-        description: This template will create a single secret.
-        tags: ''
-    objects:
-    - apiVersion: v1
-      kind: Secret
-      metadata:
-        name: sshsecret${IDENTIFIER}
-      data:
-        ssh-privatekey: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdWJOek5CaUl0aXJRemtRa3kydU05aVdvRFp0UEhkS3hPeW1YNXFPOVE3UG4wVnJQCjlQelB0VlErUHNkRXhTZzFvaXlWMjU2M3diWVdjVW10NGNXVnlmMWtPUTl3YVRBUnRUTTBOTkorTWhTeExLUkYKL2VqQjRETmxEWHdHcW9xck5EaE5qNENqQTZtNWVoWmV6ZTF2RlAvaFJkaXdjbUtOa0tiSzNBbTRYN0gxNjMybQpZUUl1Vlc4aHZnMlRaS3NiUXdGdUFrRmR0b2VqazZMUmVuMWhLVDdZcEFLaCs4bWNabHphUEtNbjlKRG4vdXJ5CnNPeVdZSDBnenNEL1g2NGJnOWd2b2JMWlBFL2pwN1ZqNFJRTHV3U3NudjFYWFV6WkM1RTlqTjRxbE5oZzk3Z0wKTFJyRzVBRUhZZ3pibTh6d2VkMEpFMXhBTFFhbXBOUnl5T1ZlMXdJREFRQUJBb0lCQUM3Umdtc1JBRzdGTHEzQwpXbkI2NWlnczZFaTk3bDE3Z0RtRlRBblhJR0dRV3hMYVRYSGJ4MVpWTGZoUDd4T3lCb3VqcUFpZDVJQlBNeXRPCnd5c1gwS01EWXFCTU56QWQ4V2o0eHVIR2JCQ2VUT2tQWmFJVmE4UGwwVVZzRHBZeXJlVlZpS0IwY3lUNlJvdjAKVmVTZlJ4RkpUZmQ1SVV0RmM2R1RtN09NTTlMVU1sWEh4NFhiREN2MDhOdlFSdk9NbUtHTGFsSmJEMndxcTZVWgpEMjJsc1MyanFrQU1MZS9UMm42YXVDYXQzaHB1VHYvYVArRFRhS3RwZGt3UlJ6RzlrQ0FSbjNIempQM0FEYVBWCkVBaXZFWFlSVW45MkZ4TlhlZ0xtL2R1WnZ2dFI0dzN3NDVBL2tVWUhnQXE1a2o4bHkwSWhCOVNMZDVFZmprVmUKWXNkNUJWa0NnWUVBMnFoVXdPNkk0cUZNU3VvSUszN3d1a01ZYTV2M2ErV2ZuUXN1ZGYxWSswYVNTeFlDT0dseAowenFuNUdRakVuZVhiVkViNDlUVlhyTStvdWRoTzZJZTQvWmxKNmxFS2tvbnB1QlMzYi93c3NOZFd5VEZJZkp0CkxBby9pM09FQlB3OTQvczFuNm1saXVodnI1WnpFSzBjend4NFBZaUFEOTVRaWIyVlAxTjFBdFVDZ1lFQTJXcEQKZ203Nm1zQnZyTENGOWFLV0EwTHZRVjV4ZE9OVHBZd0Z5WWRSei9MOXZhcW9kS280dzBLMkpFSWFwcWg5VXB3dwpWS3dxS0k3TUY0ZVplVnNLS1JKZldLcmZKdWhwT2hHNlFDSXNzQm5kNExmN3RxaHp1Z3Q3bkFicnd3SjFIS3BrCi9Xb0g3MGZFdjl5dVBxQ0pzMFR6ZWRJTVl5M2M5dkg5UGg3Wk9Qc0NnWUI2OElvMnIrZG5CU25RTlNYQ3p1eXEKelc2OWtrUGE5cEIzekFHamRYN0NTVHVYM0JnRGY4WHY3ZHJZSHpWWS9NUzNRaE5jVmg1aDBJWTNNY0VKdG0ySAozdEdoS3hxWWJIays2b0d0REc1WkZGODVEOE9IQXJjL084UGV0R1JXS1R6aklpdFVTaDQ1cTlhZjh3ZGZLUFk1CnM5a25QOGhCSTg1RW84TjJoNFlTd1FLQmdRQzRvQ0dHRVFJbENnZUxhVGZJMlBGMUFaRTFQS015TkoxaXRwNXYKZmNjK3hNVXZIRTREREU0NW1sd2NQRHB2amlNbVZOWkNBUlduN1dOcEU5Q0Rtb2p0U2RuSDdRcWsrclhwQndiWAowVzJMZWR2T0tjN0tWUkE1UytrREhXbDE1NDlWOFdqalBmaFEvT3dhVmFkdUxWdmg3VXFwQjNOWGdhbmoxcWxMCjZGeGtvd0tCZ1FDQUkreWtKSmpyWXAyYmhMZVZGSzRUNWcxY3l2Q2dRL0FSVE1WWEtNWGNhbEhTVlJlZysvMEoKSHJYcGZ5MXJ1S3ZTYko1OG5XeDVmRVcwWHpiVFVhY3VjWStYaHVSY2pVN1ptb0w4T2RIZzBodW0yTVlxZytaSwpXZXQ0UkNDdmM5eVVwZzBybUFQZUtvc2w4WUVOcHRwWUJYWHpudzdaNE1KNVcyKy9xbTUvVUE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tGTo=
-      type: Opaque
-    parameters:
-    - name: IDENTIFIER
-      description: Number to append to the name of resources
-      value: '1'
-      required: true
-    labels:
-      template: sshSecretTemplate

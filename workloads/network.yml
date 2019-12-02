@@ -24,8 +24,6 @@
       with_items:
         - src: scale-ci-tooling-ns.yml
           dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
-        - src: workload-network-script-cm.yml
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-network-script-cm.yml"
 
     - name: Slurp kubeconfig file
       slurp:
@@ -73,6 +71,8 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-network-env.yml"
+        - src: workload-network-script-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-network-script-cm.yml"
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |

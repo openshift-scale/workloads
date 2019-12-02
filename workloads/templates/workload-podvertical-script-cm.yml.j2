@@ -84,7 +84,10 @@ data:
       export AZURE_AUTH_LOCATION=/tmp/azure_auth
     fi
     start_time=$(date +%s)
-    VIPERCONFIG=/tmp/podvertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
+    export es={{ snafu_es_host }}
+    export es_port={{ snafu_es_port }}
+    export es_index={{ snafu_es_index_prefix }}
+    VIPERCONFIG=/tmp/podvertical.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests | tee "${result_dir}/clusterloader.txt"
     exit_code=$?
     end_time=$(date +%s)
     duration=$((end_time-start_time))

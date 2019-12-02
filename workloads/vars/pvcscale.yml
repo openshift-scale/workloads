@@ -9,6 +9,10 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 ###############################################################################
 # RHCOS pvcscale workload variables.
 ###############################################################################
+# snafu es variables
+snafu_es_host: "{{ lookup('env', 'ES_HOST')|default('', true) }}"
+snafu_es_port: "{{ lookup('env', 'ES_PORT')|default('', true) }}"
+snafu_es_index_prefix: "{{ lookup('env', 'ES_INDEX_PREFIX')|default('snafu', true) }}"
 
 # Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
@@ -48,4 +52,4 @@ pvcscale_pause: "{{ lookup('env', 'PVCSCALE_PAUSE')|default(0, true)|int }}"
 pvcscale_storage_size: "{{ lookup('env', 'PVCSCALE_STORAGE_SIZE')|default('1Gi', true) }}"
 pvcscale_storageclass: "{{ lookup('env', 'PVCSCALE_STORAGECLASS')|default('', true) }}"
 pvcscale_access_modes: "{{ lookup('env', 'PVCSCALE_ACCESS_MODES')|default('ReadWriteOnce',true) }}"
-pvcscale_nodeselector: "{{ lookup('env', 'PVCSCALE_NODESELECTOR')|default('', true) }}" 
+pvcscale_nodeselector: "{{ lookup('env', 'PVCSCALE_NODESELECTOR')|default('', true) }}"

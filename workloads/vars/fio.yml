@@ -9,6 +9,10 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 ###############################################################################
 # RHCOS fiotest workload variables.
 ###############################################################################
+# snafu es variables
+snafu_es_host: "{{ lookup('env', 'ES_HOST')|default('', true) }}"
+snafu_es_port: "{{ lookup('env', 'ES_PORT')|default('', true) }}"
+snafu_es_index_prefix: "{{ lookup('env', 'ES_INDEX_PREFIX')|default('snafu', true) }}"
 
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
 workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default('', true)|bool }}"
@@ -42,9 +46,9 @@ fiotest_bs: "{{ lookup('env', 'FIOTEST_BS')|default(4, true)|int }}"
 fiotest_filename: "{{ lookup('env', 'FIOTEST_FILENAME')|default('/mnt/pvcmount/f2', true) }}"
 fiotest_filesize: "{{ lookup('env', 'FIOTEST_FILESIZE')|default('1GB', true) }}"
 fiotest_runtime: "{{ lookup('env', 'FIOTEST_RUNTIME')|default(600, true)|int }}"
-fiotest_direct: "{{ lookup('env', 'FIOTEST_DIRECT')|default(1, true)|int }}" 
-fiotest_iodepth: "{{ lookup('env', 'FIOTEST_IODEPTH')|default(1, true)|int }}" 
-fiotest_testtype: "{{ lookup('env', 'FIOTEST_TESTTYPE')|default('write', true) }}" 
+fiotest_direct: "{{ lookup('env', 'FIOTEST_DIRECT')|default(1, true)|int }}"
+fiotest_iodepth: "{{ lookup('env', 'FIOTEST_IODEPTH')|default(1, true)|int }}"
+fiotest_testtype: "{{ lookup('env', 'FIOTEST_TESTTYPE')|default('write', true) }}"
 fiotest_samples: "{{ lookup('env', 'FIOTEST_SAMPLES')|default(1, true)|int }}"
 fiotest_nodeselector: "{{ lookup('env', 'FIOTEST_NODESELECTOR')|default('', true) }}"
 fiotest_description: "{{lookup('env', 'FIOTEST_DESCRIPTION')|default('', true) }}"

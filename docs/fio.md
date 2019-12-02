@@ -8,17 +8,17 @@ write, random read/write, randrw, rw.
 
 Requirements:
 
-* Working storage backend and working storage class 
+* Working storage backend and working storage class
 
 FIO I/O test will use dynamic provisioning to allocate PVC and attach it to Pod
 so it requirement to have working storage class prior starting this test.
 
-* `PBENCH_SERVER` variable to set to valid pbench server 
+* `PBENCH_SERVER` variable to set to valid pbench server
 
 How to setup pbench server is described in pbench
 [documentation](https://distributed-system-analysis.github.io/pbench/doc/server/installation.html)
 
- 
+
 Running from CLI:
 
 ```sh
@@ -29,6 +29,18 @@ $ time ansible-playbook -vv -i inventory workloads/fio.yml
 ```
 
 ## Environment variables
+
+### ES_HOST
+Default: ``
+Elasticsearch server host address (currently used by snafu), set to index results from cluster loader
+
+### ES_PORT
+Default: ``
+Elasticsearch server port (currently used by snafu), set to index results from cluster loader
+
+### ES_INDEX_PREFIX
+Default: `snafu`
+Elasticsearch server index prefix (currently used by snafu)
 
 ### PUBLIC_KEY
 
@@ -81,7 +93,7 @@ and if this option is enabled then tooling playbook needs to be executed prior t
 Default: `true`  
 
 Enables/disables the copying of pbench data to a remote results server for further analysis.
-As of now, this test requires valid `PBENCH_SERVER` where it will copy results at end of test. 
+As of now, this test requires valid `PBENCH_SERVER` where it will copy results at end of test.
 
 ### PBENCH_SSH_PRIVATE_KEY_FILE
 
@@ -107,10 +119,10 @@ Future use for pbench and prometheus scraper to place results into git repo that
 
 Default: `10000`  
 
-Number of retries for Ansible to poll if the workload job has completed. 
+Number of retries for Ansible to poll if the workload job has completed.
 Poll attempts delay 10s between polls with some additional time taken for each polling action depending on the orchestration host setup.
 FIO I/O test for many pods and big file sizes can run for hours and either we rise `JOB_COMPLETION_POLL_ATTEMPTS` to
-higt value, or remove fully checking for `JOB_COMPLETION_POLL_ATTEMPTS` for FIO I/O test. 
+higt value, or remove fully checking for `JOB_COMPLETION_POLL_ATTEMPTS` for FIO I/O test.
 
 
 ### AZURE_AUTH
@@ -146,7 +158,7 @@ Maximum number of Pods that FIO I/O test will create for test
 
 Default: `quay.io/openshift-scale/scale-ci-fio:latest`
 
-Container image to use for FIO Pods 
+Container image to use for FIO Pods
 
 ### FIOTEST_STEPSIZE
 
@@ -157,7 +169,7 @@ Number of Pods for cluster loader will create before waiting for Pods to become 
 
 Default: `0`  
 Period of time (in seconds) for cluster loader to pause after creating Pods and waiting for them to be "Running" state.
-When `FIOTEST_PAUSE` is zero, cluster loader will create pods in fastest possible manner. 
+When `FIOTEST_PAUSE` is zero, cluster loader will create pods in fastest possible manner.
 
 ### FIOTEST_STORAGE_SIZE
 
@@ -172,7 +184,7 @@ Default: ``
 
 This parameter defines what storageclass to use to dynamically allocate PVC. It is expected that storage class is
 present and functional in order for test to work.
-Storage class name will be different and depends on environment, common storage class names are 
+Storage class name will be different and depends on environment, common storage class names are
 
 * AWS - gp2
 * Azure - managed-premium
@@ -185,18 +197,18 @@ Storage class name will be different and depends on environment, common storage 
 Default: `ReadWriteOnce`
 
 `FIOTEST_ACCESS_MODES` is responsible for PVC access mode. This parameter will accept one of `ReadWriteOnce` ,
-`ReadWriteMany` or `ReadOnlyMany`. It is important to understand that particular access mode must be supported 
-by storage used for test. 
+`ReadWriteMany` or `ReadOnlyMany`. It is important to understand that particular access mode must be supported
+by storage used for test.
 
 ### FIOTEST_BS
 
 Default: `4`
 
-Fio block size. 
+Fio block size.
 
 ### FIOTEST_FILENAME
 
-Default: `/mnt/pvcmount/f2` 
+Default: `/mnt/pvcmount/f2`
 
 FIO file to write. PVC is mounted inside FIO pod to `/mnt/pvcmount` and thus inside this mount point fio file is
 created. This ensures that I/O operations are executed against PVC.
@@ -205,7 +217,7 @@ created. This ensures that I/O operations are executed against PVC.
 
 Default: `1GB`
 
-FIO file size and its size cannot exceed `FIOTEST_STORAGE_SIZE`. 
+FIO file size and its size cannot exceed `FIOTEST_STORAGE_SIZE`.
 
 ### FIOTEST_RUNTIME
 
@@ -230,14 +242,14 @@ Number of I/O units to keep in flight  against  the  file
 
 Default: `read`
 
-FIO test type to execute. Default is `read`, supported are : read,write,randread,randwrite,randrw,rw 
+FIO test type to execute. Default is `read`, supported are : read,write,randread,randwrite,randrw,rw
 
 ### FIOTEST_SAMPLES
 
 Default: `1`
 
 Running one iteration of test can give misleading results, and it is recommended to run multiple iterations to catch up
-deviations and anomalies. Test result will show best iteration. 
+deviations and anomalies. Test result will show best iteration.
 
 ### FIOTEST_NODESELECTOR
 
@@ -245,7 +257,7 @@ Default: ""
 
 For cases when it is necessary to have FIO pods to be assigned to already labeled nodes with specific label
 `FIOTEST_NODESELECTOR` allows to specify desired label.
-FIO I/O test does not label nodes, it expect that labels are already assigned to nodes. 
+FIO I/O test does not label nodes, it expect that labels are already assigned to nodes.
 
 
 

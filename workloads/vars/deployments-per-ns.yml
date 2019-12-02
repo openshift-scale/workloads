@@ -9,6 +9,10 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 ###############################################################################
 # Deployments per namespace cluster limits workload variables.
 ###############################################################################
+# snafu es variables
+snafu_es_host: "{{ lookup('env', 'ES_HOST')|default('', true) }}"
+snafu_es_port: "{{ lookup('env', 'ES_PORT')|default('', true) }}"
+snafu_es_index_prefix: "{{ lookup('env', 'ES_INDEX_PREFIX')|default('snafu', true) }}"
 
 # Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"

@@ -39,7 +39,7 @@ A workload consists of
 Example (Network workload)
 * [Network playbook](../workloads/network.yml)
 * [Network vars](../workloads/vars/network.yml)
-* [Network configmap script](../workloads/files/workload-network-script-cm.yml)
+* [Network configmap script](../workloads/templates/workload-network-script-cm.yml.j2)
 * [Network environment vars](../workloads/templates/workload-env.yml.j2)
 * [Workload job resource](../workloads/templates/workload-job.yml.j2)
 * [Network uperf image Dockerfile](https://github.com/openshift-scale/images/blob/master/scale-ci-uperf/Dockerfile)
