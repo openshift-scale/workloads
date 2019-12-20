@@ -1,0 +1,14 @@
+---
+- name: Slurp azure auth file
+  slurp:
+    src: "{{azure_auth_file}}"
+  register: azure_auth_file_slurp
+
+- name: Template azure auth template
+  template:
+    src: azure-auth-secret.yml.j2
+    dest: "{{ansible_user_dir}}/scale-ci-tooling/azure-auth-secret.yml"
+
+- name: Create/replace azure auth secret
+  shell: |
+    oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/azure-auth-secret.yml"

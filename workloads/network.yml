@@ -124,6 +124,11 @@
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-network-env.yml"
 
+    - name: Enable azure authentication when running ocp on azure
+      include_role:
+        name: azure-auth
+      when: azure_auth and azure_auth_file != ""
+
     - name: Create/replace workload job to that runs workload script
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"

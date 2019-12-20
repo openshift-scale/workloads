@@ -56,6 +56,9 @@ data:
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       result_dir=${benchmark_results_dir}
     fi
+    if [[ "${AZURE_AUTH}" == "true" ]]; then
+      export AZURE_AUTH_LOCATION=/tmp/azure_auth
+    fi
     start_time=$(date +%s)
     export KUBECONFIG=/root/.kube/config; /usr/bin/openshift-tests run openshift/conformance/parallel || exit 0
     end_time=$(date +%s)

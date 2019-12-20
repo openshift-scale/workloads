@@ -113,6 +113,14 @@ FIO I/O test for many pods and big file sizes can run for hours and either we ri
 higt value, or remove fully checking for `JOB_COMPLETION_POLL_ATTEMPTS` for FIO I/O test. 
 
 
+### AZURE_AUTH
+Default: false
+Set it to true when running OCP on Azure.
+
+### AZURE_AUTH_FILE
+Default: ''
+Path to the Azure auth file - terraform.azure.auto.tfvars.json found in the openshift install dir on the orchestration host i.e scale-ci-deploy/scale-ci-azure/terraform.azure.auto.tfvars.json.
+
 ### FIOTEST_PREFIX
 
 Default: `fiotest`

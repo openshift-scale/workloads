@@ -62,6 +62,11 @@ spec:
         - name: pbench-ssh
           mountPath: /.ssh/id_rsa.pub
           subPath: id_rsa.pub
+{% if azure_auth %}
+        - name: azure-auth
+          mountPath: /tmp/azure_auth
+          subPath: azure_auth
+{% endif %}
         - name: unprivileged-ssh
           mountPath: /.ssh
         - name: pbench-ssh
@@ -69,7 +74,6 @@ spec:
           subPath: id_rsa
         - name: pbench-results
           mountPath: /var/lib/pbench-agent
-
 {% if enable_pbench_agents %}
         - name: ocp-volumes
           mountPath: /var/lib/kubelet/pods
@@ -107,6 +111,11 @@ spec:
         secret:
           secretName: pbench-ssh
           defaultMode: 0600
+{% if azure_auth %}
+      - name: azure-auth
+        secret:
+          secretName: azure-auth
+{% endif %}
       - name: unprivileged-ssh
         emptyDir: {}
 {% if enable_pbench_agents %}

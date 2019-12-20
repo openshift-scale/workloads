@@ -79,6 +79,14 @@ Future use for pbench and prometheus scraper to place results into git repo that
 Default: `360`  
 Number of retries for Ansible to poll if the workload job has completed. Poll attempts delay 10s between polls with some additional time taken for each polling action depending on the orchestration host setup.
 
+### AZURE_AUTH
+Default: false
+Set it to true when running OCP on Azure.
+
+### AZURE_AUTH_FILE
+Default: ''
+Path to the Azure auth file - terraform.azure.auto.tfvars.json found in the openshift install dir on the orchestration host i.e scale-ci-deploy/scale-ci-azure/terraform.azure.auto.tfvars.json.
+
 ### CONFORMANCE_TEST_PREFIX
 Default: `conformance`  
 Test to prefix the pbench results.

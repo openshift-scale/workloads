@@ -38,6 +38,9 @@ data:
 
     # Start of Test Code
     echo "$(date -u) Running Deployments per ns cluster limits test"
+    if [[ "${AZURE_AUTH}" == "true" ]]; then
+      export AZURE_AUTH_LOCATION=/tmp/azure_auth
+    fi
     pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/cluster-limits-deployments-per-namespace.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     pbench-copy-results --prefix {{deployments_per_ns_test_prefix}}
     echo "$(date -u) Completed running Deployments per ns cluster limits test"

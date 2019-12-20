@@ -41,7 +41,7 @@
       slurp:
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
-
+    
     - name: Remove nodevertical label from nodes
       shell: |
         oc label nodes -l nodevertical=true nodevertical-
@@ -144,10 +144,15 @@
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-env.yml"
 
+    - name: Enable azure authentication when running ocp on azure
+      include_role:
+        name: azure-auth
+      when: azure_auth and azure_auth_file != ""
+
     - name: Create/replace workload job to that runs workload script
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
-
+    
     - name: Poll until job pod is running
       shell: |
         oc get pods --selector=job-name=scale-ci-nodevertical -n scale-ci-tooling -o json

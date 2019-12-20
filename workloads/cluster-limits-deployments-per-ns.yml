@@ -112,6 +112,11 @@
       shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
 
+    - name: Enable azure authentication when running ocp on azure
+      include_role:
+        name: azure-auth
+      when: azure_auth and azure_auth_file != ""
+
     - name: Poll until job pod is running
       shell: |
         oc get pods --selector=job-name=scale-ci-deployments-per-ns -n scale-ci-tooling -o json

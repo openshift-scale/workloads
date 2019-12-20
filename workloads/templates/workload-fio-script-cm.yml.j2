@@ -42,6 +42,9 @@ data:
     # End pbench Configuration
     #
     # Test Configuration
+    if [[ "${AZURE_AUTH}" == "true" ]]; then
+      export AZURE_AUTH_LOCATION=/tmp/azure_auth
+    fi
     echo "$(date -u) Creating pods for FIO I/O scale test - pods will be in namespace:" {{ fiotest_basename }}0
     pbench-user-benchmark --config="{{ fiotest_prefix }}-pods-{{ fiotest_maxpods }}-sc-{{ fiotest_storageclass }}-create_pods-{{ fiotest_description }}" -- 'VIPERCONFIG=/root/workload/fiotest.yml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"'
     echo "$(date -u) Pods for FIO I/O test created."

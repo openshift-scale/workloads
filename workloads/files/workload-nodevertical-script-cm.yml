@@ -81,6 +81,9 @@ data:
       result_dir=${benchmark_results_dir}
     fi
     start_time=$(date +%s)
+    if [[ "${AZURE_AUTH}" == "true" ]]; then
+      export AZURE_AUTH_LOCATION=/tmp/azure_auth
+    fi
     VIPERCONFIG=/tmp/nodevertical.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]" | tee "${result_dir}/clusterloader.txt"
     exit_code=$?
     end_time=$(date +%s)

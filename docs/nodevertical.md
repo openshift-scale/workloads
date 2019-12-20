@@ -82,6 +82,14 @@ Future use for pbench and prometheus scraper to place results into git repo that
 Default: `360`  
 Number of retries for Ansible to poll if the workload job has completed. Poll attempts delay 10s between polls with some additional time taken for each polling action depending on the orchestration host setup.
 
+### AZURE_AUTH
+Default: false
+Set it to true when running OCP on Azure.
+
+### AZURE_AUTH_FILE
+Default: ''
+Path to the Azure auth file - terraform.azure.auto.tfvars.json found in the openshift install dir on the orchestration host i.e scale-ci-deploy/scale-ci-azure/terraform.azure.auto.tfvars.json.
+
 ### NODEVERTICAL_NODE_COUNT
 Default: `4`  
 Number of nodes to apply the nodevertical label to.  This isolates the NodeVertical Pods to achieve kubelet density.  You will have to adjust the value here for clusters < 5 nodes.

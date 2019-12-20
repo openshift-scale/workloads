@@ -65,7 +65,9 @@ data:
       else
         PAIR_COUNT=${pair_count} envsubst < /root/workload/p2p-network.yaml.template > /tmp/network.yaml
       fi
-
+      if [[ "${AZURE_AUTH}" == "true" ]]; then
+        export AZURE_AUTH_LOCATION=/tmp/azure_auth
+      fi
       VIPERCONFIG=/tmp/network.yaml openshift-tests run-test "[Feature:Performance][Serial][Slow] Load cluster should load the cluster [Suite:openshift]"
 
       # Check if clients and servers are ready
