@@ -4,7 +4,6 @@ metadata:
   name: scale-ci-workload-{{workload_job}}-env
 data:
   ENABLE_PBENCH_AGENTS: "{{enable_pbench_agents|bool|lower}}"
-  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% if workload_job == "http" %}
 {% for v in http_env_vars %}
   {{ v }}: "{{ lookup('env', v) }}"
@@ -17,6 +16,7 @@ data:
   MASTERVERTICAL_BASENAME: "{{mastervertical_basename}}"
   MASTERVERTICAL_PROJECTS: "{{mastervertical_projects}}"
   EXPECTED_MASTERVERTICAL_DURATION: "{{expected_mastervertical_duration}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "network" %}
   NETWORK_TEST_UPERF_IMAGE: "{{network_test_uperf_image}}"
   NETWORK_TEST_UPERF_SSHD_PORT: "{{network_test_uperf_sshd_port}}"
@@ -36,6 +36,7 @@ data:
   NETWORK_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
   NETWORK_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
   NETWORK_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "nodevertical" %}
   TOTAL_POD_COUNT: "{{total_pod_count.stdout|int}}"
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
@@ -49,6 +50,7 @@ data:
   NODEVERTICAL_PAUSE: "{{nodevertical_pause}}"
   NODEVERTICAL_TS_TIMEOUT: "{{nodevertical_ts_timeout}}"
   EXPECTED_NODEVERTICAL_DURATION: "{{expected_nodevertical_duration}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "podvertical" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
@@ -61,6 +63,7 @@ data:
   PODVERTICAL_PAUSE: "{{podvertical_pause}}"
   PODVERTICAL_TS_TIMEOUT: "{{podvertical_ts_timeout}}"
   EXPECTED_PODVERTICAL_DURATION: "{{expected_podvertical_duration}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "scale" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
@@ -73,6 +76,7 @@ data:
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
   CONFORMANCE_TEST_PREFIX: "{{conformance_test_prefix}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "namespaces-per-cluster" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
@@ -81,6 +85,7 @@ data:
   NAMESPACES_PER_CLUSTER_BASENAME: "{{namespaces_per_cluster_basename}}"
   NAMESPACES_PER_CLUSTER_COUNT: "{{namespaces_per_cluster_count}}"
   EXPECTED_NAMESPACES_PER_CLUSTER_DURATION: "{{expected_namespaces_per_cluster_duration}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "services-per-namespace" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
@@ -90,12 +95,14 @@ data:
   SERVICES_PER_NAMESPACE_PROJECTS: "{{services_per_namespace_projects}}"
   SERVICES_PER_NAMESPACE_COUNT: "{{services_per_namespace_count}}"
   EXPECTED_SERVICES_PER_NAMESPACE_DURATION: "{{expected_services_per_namespace_duration}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "storage-fio" %}
   FIOTEST_CONTAINER_IMAGE: "{{fiotest_container_image}}"
   FIO_SSH_PORT: "{{fio_ssh_port}}"
   FIOTEST_SSH_AUTHORIZED_KEYS: "{{pbench_ssh_public_key_file_slurp['content']}}"
   FIOTEST_SSH_PRIVATE_KEY: "{{pbench_ssh_private_key_file_slurp['content']}}"
   FIOTEST_SSH_PUBLIC_KEY: "{{pbench_ssh_public_key_file_slurp['content']}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "prometheus-scale" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
