@@ -50,6 +50,7 @@
       template:
         src: "{{item.src}}"
         dest: "{{item.dest}}"
+        lstrip_blocks: yes
       with_items:
         - src: pbench-cm.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/pbench-cm.yml"
