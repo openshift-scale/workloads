@@ -932,6 +932,7 @@ data:
                   - SETUID
                   - SYS_CHROOT
                 privileged: false
+            nodeSelector: "node-role.kubernetes.io/worker="
             restartPolicy: Always
     - apiVersion: v1
       kind: Route
@@ -1012,6 +1013,7 @@ data:
                   - SETUID
                   - SYS_CHROOT
                 privileged: false
+            nodeSelector: "node-role.kubernetes.io/worker="
             restartPolicy: Always
     - apiVersion: v1
       kind: Route
@@ -1096,6 +1098,7 @@ data:
                   - SETUID
                   - SYS_CHROOT
                 privileged: false
+            nodeSelector: "node-role.kubernetes.io/worker="
             restartPolicy: Always
     - apiVersion: v1
       kind: Route
@@ -1178,6 +1181,7 @@ data:
                   - SETUID
                   - SYS_CHROOT
                 privileged: false
+            nodeSelector: "node-role.kubernetes.io/worker="
             restartPolicy: Always
     - apiVersion: v1
       kind: Route
