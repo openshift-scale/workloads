@@ -62,7 +62,7 @@ spec:
         - name: pbench-ssh
           mountPath: /.ssh/id_rsa.pub
           subPath: id_rsa.pub
-{% if workload_job != "scale" and workload_job != "prometheus-scale" and workload_job != "baseline" %}
+{% if workload_job != "scale" and workload_job != "prometheus-scale" and workload_job != "baseline" and workload_job != "http" %}
     {% if azure_auth| bool %}
         - name: azure-auth
           mountPath: /tmp/azure_auth
@@ -113,7 +113,7 @@ spec:
         secret:
           secretName: pbench-ssh
           defaultMode: 0600
-{% if workload_job != "scale" and workload_job != "prometheus-scale" and workload_job != "baseline" %}
+{% if workload_job != "scale" and workload_job != "prometheus-scale" and workload_job != "baseline" and workload_job != "http" %}
     {% if azure_auth| bool %}
       - name: azure-auth
         secret:
