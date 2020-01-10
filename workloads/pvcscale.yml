@@ -40,6 +40,19 @@
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
 
+    - name: Block to set clustername
+      block:
+        - name: Get cluster name
+          shell: |
+            {%raw%}oc get machineset -n openshift-machine-api -o=go-template='{{index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster"}}'{%endraw%}
+          register: cluster_name
+
+        - name: Create tooling service account
+          set_fact:
+            snafu_cluster_name: cluster_name.stdout
+          when: cluster_name is succeeded
+      when: snafu_cluster_name == ""
+
     - name: Template workload templates
       template:
         src: "{{item.src}}"

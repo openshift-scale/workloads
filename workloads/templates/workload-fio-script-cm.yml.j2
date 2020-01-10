@@ -47,6 +47,8 @@ data:
     fi
     echo "$(date -u) Creating pods for FIO I/O scale test - pods will be in namespace:" {{ fiotest_basename }}0
     mkdir -p /tmp/snafu_results
+    export cluster_name={{ snafu_cluster_name }}
+    export test_user={{ snafu_user }}
     export es={{ snafu_es_host }}
     export es_port={{ snafu_es_port }}
     export es_index={{ snafu_es_index_prefix }}

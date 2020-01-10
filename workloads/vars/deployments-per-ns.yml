@@ -13,6 +13,8 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 snafu_es_host: "{{ lookup('env', 'ES_HOST')|default('', true) }}"
 snafu_es_port: "{{ lookup('env', 'ES_PORT')|default('', true) }}"
 snafu_es_index_prefix: "{{ lookup('env', 'ES_INDEX_PREFIX')|default('snafu', true) }}"
+snafu_cluster_name: "{{ lookup('env', 'SNAFU_CLUSTER_NAME')|default('', true) }}"
+snafu_user: "{{ lookup('env', 'SNAFU_USER')|default('scale-ci', true) }}"
 
 # Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"

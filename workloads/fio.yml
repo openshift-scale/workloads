@@ -40,6 +40,19 @@
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
 
+    - name: Block to set clustername
+      block:
+        - name: Get cluster name
+          shell: |
+            {%raw%}oc get machineset -n openshift-machine-api -o=go-template='{{index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster"}}'{%endraw%}
+          register: cluster_name
+
+        - name: Create tooling service account
+          set_fact:
+            snafu_cluster_name: cluster_name.stdout
+          when: cluster_name is succeeded
+      when: snafu_cluster_name == ""
+
     - name: Template workload templates
       template:
         src: "{{item.src}}"
@@ -94,7 +107,7 @@
 
     - name: Add serviceaccount for useroot when pbench is not used
       shell: |
-        oc delete serviceaccount -n scale-ci-tooling useroot 
+        oc delete serviceaccount -n scale-ci-tooling useroot
         oc create serviceaccount useroot -n scale-ci-tooling
       when: not enable_pbench_agents|bool
 
@@ -115,7 +128,7 @@
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-fio-script-cm.yml"
 
     - name: Create/replace workload script environment configmap
-      shell: | 
+      shell: |
         oc replace --force -n scale-ci-tooling -f "{{ansible_user_dir}}/scale-ci-tooling/workload-storage-fio-env.yml"
 
     - name: Enable azure authentication when running ocp on azure

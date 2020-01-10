@@ -42,6 +42,8 @@ data:
       export AZURE_AUTH_LOCATION=/tmp/azure_auth
     fi
     mkdir -p /tmp/snafu_results
+    export cluster_name={{ snafu_cluster_name }}
+    export test_user={{ snafu_user }}
     export es={{ snafu_es_host }}
     export es_port={{ snafu_es_port }}
     export es_index={{ snafu_es_index_prefix }}
