@@ -166,6 +166,7 @@ data:
       - num: 1
         basename: "${NETWORK_TEST_BASENAME}"
         ifexists: delete
+        nodeselector: "node-role.kubernetes.io/worker="
         templates:
         - num: 1
           file: /root/workload/pbench-ssh.yaml

@@ -105,6 +105,7 @@ data:
         - num: ${MASTERVERTICAL_PROJECTS}
           basename: ${MASTERVERTICAL_BASENAME}
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           templates:
             - num: 3
               file: /root/workload/build-config-template.yaml

@@ -107,6 +107,7 @@ data:
           basename: ${PODVERTICAL_BASENAME}
           tuning: default
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           pods:
             - num: ${PODVERTICAL_MAXPODS}
               basename: podvert

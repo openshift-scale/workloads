@@ -105,6 +105,7 @@ data:
         - num: ${SERVICES_PER_NAMESPACE_PROJECTS}
           basename: ${SERVICES_PER_NAMESPACE_BASENAME}
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           templates:
             - num: ${SERVICES_PER_NAMESPACE_COUNT}
               file: /root/workload/deployment-config-cluster-limits-services.yaml

@@ -107,6 +107,7 @@ data:
           basename: ${NODEVERTICAL_BASENAME}
           tuning: default
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           pods:
             - num: ${TOTAL_POD_COUNT}
               basename: nodevert

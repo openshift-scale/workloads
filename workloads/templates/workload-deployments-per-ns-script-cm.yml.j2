@@ -58,6 +58,7 @@ data:
         - num: 1
           basename: {{deployments_per_ns_basename}}
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           templates:
             - num: {{deployments_per_ns_count}}
               file: deployment-config-cluster-limits-deployments.yaml

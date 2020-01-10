@@ -107,6 +107,7 @@ data:
         - num: 1
           basename: {{ fiotest_basename }}
           ifexists: delete
+          nodeselector: "node-role.kubernetes.io/worker="
           nodeselector: {{ fiotest_nodeselector }}
           templates:
             - num: 1
