@@ -69,8 +69,8 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-services-per-namespace-env.yml"
-        - src: workload-services-per-namespace-script-cm.yml
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-services-per-namespace-script-cm.yml.j2"
+        - src: workload-services-per-namespace-script-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-services-per-namespace-script-cm.yml"
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |
