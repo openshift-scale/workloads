@@ -346,6 +346,8 @@ data:
                 for dashboard in self.dashboards:
                     self.dashboardname = dashboard['name']
                     self.con = len(dashboard['queries'])
+                    if self.con == 0:
+                        continue
                     self.executor = ThreadPoolExecutor(max_workers=self.con)
                     self.run_loader(dashboard['queries'])
                     time.sleep(self.interval)
