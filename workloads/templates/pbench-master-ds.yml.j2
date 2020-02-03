@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: pbench-agent-master
@@ -7,6 +7,9 @@ metadata:
   labels:
     name: pbench-agent-master
 spec:
+  selector:
+    matchLabels:
+      name: pbench-agent-master
   template:
     metadata:
       labels:
