@@ -46,14 +46,14 @@
 
     - name: Label worker nodes with pbench agent for network tests
       shell: |
-        oc get nodes --no-headers -l pbench_agent=true,node-role.kubernetes.io/worker= | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
-        oc get nodes --no-headers --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
+        oc get nodes --no-headers -l pbench_agent=true,node-role.kubernetes.io/worker= | grep -v infra | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
+        oc get nodes --no-headers --show-labels -l pbench_agent=true,node-role.kubernetes.io/worker= | grep -v infra | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
       when: enable_pbench_agents|bool
 
     - name: Label worker nodes when there are no pbench agents for network tests
       shell: |
-        oc get nodes --no-headers -l node-role.kubernetes.io/worker= | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
-        oc get nodes --no-headers --show-labels -l node-role.kubernetes.io/worker= | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
+        oc get nodes --no-headers -l node-role.kubernetes.io/worker= | grep -v infra | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=client
+        oc get nodes --no-headers --show-labels -l node-role.kubernetes.io/worker= | grep -v infra | grep -v uperf=client | head -n 1 | awk '{print $1}' | xargs -I % oc label nodes % uperf=server
       when: not enable_pbench_agents|bool
 
     - name: Block to set clustername

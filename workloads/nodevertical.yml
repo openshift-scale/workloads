@@ -49,22 +49,22 @@
       block:
         - name: Label worker nodes with pbench agent for nodevertical (NODEVERTICAL_NODE_COUNT < 2)
           shell: |
-            oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | head -n {{nodevertical_node_count}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+            oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | grep -v infra | head -n {{nodevertical_node_count}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
           when: nodevertical_node_count|int <= 2
 
         - name: Label worker nodes with pbench agent for nodevertical (NODEVERTICAL_NODE_COUNT > 2)
           shell: |
-            oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+            oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | grep -v infra | head -n 2 | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
           when: nodevertical_node_count|int > 2
 
         - name: Label worker nodes without pbench agent for nodevertical (NODEVERTICAL_NODE_COUNT > 2)
           shell: |
-            oc get nodes -l node-role.kubernetes.io/worker= --show-labels --no-headers | grep -v "pbench_agent=true" | head -n {{nodevertical_node_count|int -2}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+            oc get nodes -l node-role.kubernetes.io/worker= --show-labels --no-headers | grep -v infra | grep -v "pbench_agent=true" | head -n {{nodevertical_node_count|int -2}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
           when: nodevertical_node_count|int > 2
 
     - name: Label worker nodes when there are no pbench agents
       shell: |
-        oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -n {{nodevertical_node_count}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
+        oc get nodes -l node-role.kubernetes.io/worker= --no-headers | grep -v infra | head -n {{nodevertical_node_count}} | awk '{print $1}' | xargs -I % oc label nodes % nodevertical=true
       when: not enable_pbench_agents|bool
 
     - name: Calculate maximum pods to fit in nodevertical labeled space
