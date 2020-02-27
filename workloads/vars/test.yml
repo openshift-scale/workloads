@@ -13,6 +13,11 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 # Container image in use
 workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
 
+# workload variables
+workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(false, true)|bool }}"
+workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(false, true)|bool }}"
+workload_job_privileged: "{{ lookup('env', 'WORKLOAD_JOB_PRIVILEGED')|default(true, true)|bool }}"
+
 # Kubeconfig for tooling container script
 kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"
 
