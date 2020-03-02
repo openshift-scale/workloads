@@ -89,7 +89,7 @@ data:
     export es={{ snafu_es_host }}
     export es_port={{ snafu_es_port }}
     export es_index={{ snafu_es_index_prefix }}
-    VIPERCONFIG=/tmp/podvertical.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests | tee "${result_dir}/clusterloader.txt"
+    VIPERCONFIG=/tmp/podvertical.yaml python3 /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests | tee "${result_dir}/clusterloader.txt"
     exit_code=$?
     end_time=$(date +%s)
     duration=$((end_time-start_time))

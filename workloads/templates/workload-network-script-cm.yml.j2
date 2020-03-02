@@ -73,7 +73,7 @@ data:
       export es={{ snafu_es_host }}
       export es_port={{ snafu_es_port }}
       export es_index={{ snafu_es_index_prefix }}
-      VIPERCONFIG=/tmp/network.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests
+      VIPERCONFIG=/tmp/network.yaml python3 /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests
 
       # Check if clients and servers are ready
       for rc_num in `seq 0 $((${pair_count} - 1))`

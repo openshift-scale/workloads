@@ -47,7 +47,7 @@ data:
     export es={{ snafu_es_host }}
     export es_port={{ snafu_es_port }}
     export es_index={{ snafu_es_index_prefix }}
-    pbench-user-benchmark --config="{{ pvcscale_test_prefix }}-pods-{{ pvcscale_maxpods }}-sc-{{ pvcscale_storageclass }}-create_pods" -- 'VIPERCONFIG=/root/workload/pvcscale.yml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir /tmp/snafu_results -p openshift-tests'
+    pbench-user-benchmark --config="{{ pvcscale_test_prefix }}-pods-{{ pvcscale_maxpods }}-sc-{{ pvcscale_storageclass }}-create_pods" -- 'VIPERCONFIG=/root/workload/pvcscale.yml python3 /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir /tmp/snafu_results -p openshift-tests'
 
     echo "$(date -u) Pods/PVC are crated ..."
     # End Test Configuration

@@ -47,7 +47,7 @@ data:
     export es={{ snafu_es_host }}
     export es_port={{ snafu_es_port }}
     export es_index={{ snafu_es_index_prefix }}
-    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/cluster-limits-deployments-per-namespace.yaml python /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir /tmp/snafu_results -p openshift-tests'
+    pbench-user-benchmark -- 'VIPERCONFIG=/root/workload/cluster-limits-deployments-per-namespace.yaml python3 /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir /tmp/snafu_results -p openshift-tests'
     pbench-copy-results --prefix {{deployments_per_ns_test_prefix}}
     echo "$(date -u) Completed running Deployments per ns cluster limits test"
     # End of Test Code
