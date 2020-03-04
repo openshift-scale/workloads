@@ -11,7 +11,7 @@ orchestration_user: "{{ lookup('env', 'ORCHESTRATION_USER')|default('root', true
 ###############################################################################
 
 # Container image for pbench
-pbench_image: "{{ lookup('env', 'PBENCH_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+pbench_image: "{{ lookup('env', 'PBENCH_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload:master', true) }}"
 
 # Kubeconfig for tooling container script
 kubeconfig_file: "{{ lookup('env', 'KUBECONFIG_FILE')|default('~/.kube/config', true) }}"

@@ -16,7 +16,7 @@ snafu_es_index_prefix: "{{ lookup('env', 'ES_INDEX_PREFIX')|default('snafu', tru
 snafu_cluster_name: "{{ lookup('env', 'SNAFU_CLUSTER_NAME')|default('', true) }}"
 snafu_user: "{{ lookup('env', 'SNAFU_USER')|default('scale-ci', true) }}"
 
-workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload:master', true) }}"
 
 workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(false, true)|bool }}"
 workload_job_taint: "{{ lookup('env', 'WORKLOAD_JOB_TAINT')|default(false, true)|bool }}"

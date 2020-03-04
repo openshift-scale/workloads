@@ -17,7 +17,7 @@ snafu_cluster_name: "{{ lookup('env', 'SNAFU_CLUSTER_NAME')|default('', true) }}
 snafu_user: "{{ lookup('env', 'SNAFU_USER')|default('scale-ci', true) }}"
 
 # Container image in use
-workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload', true) }}"
+workload_image: "{{ lookup('env', 'WORKLOAD_IMAGE')|default('quay.io/openshift-scale/scale-ci-workload:master', true) }}"
 
 # Use nodeselector to place workload job on specific node
 workload_job_node_selector: "{{ lookup('env', 'WORKLOAD_JOB_NODE_SELECTOR')|default(true, true)|bool }}"
