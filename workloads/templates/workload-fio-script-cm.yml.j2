@@ -13,6 +13,11 @@ data:
     echo "" > /var/lib/pbench-agent/tools-default/oc
     echo "workload" > /var/lib/pbench-agent/tools-default/label
     if [[ -v ENABLE_PBENCH_AGENTS ]]; then
+      source /opt/pbench-agent/profile
+      # clear tools/remotes to make sure there are no invalid remotes
+      set +eo pipefail
+      pbench-clear-tools
+      set -eo pipefail
       echo "" > /var/lib/pbench-agent/tools-default/disk
       echo "" > /var/lib/pbench-agent/tools-default/iostat
       echo "" > /var/lib/pbench-agent/tools-default/mpstat
@@ -37,7 +42,6 @@ data:
         echo "storage" > /var/lib/pbench-agent/tools-default/remote@$node
       done
     fi
-    source /opt/pbench-agent/profile
     echo "$(date -u) Done configuring pbench for FIO I/O scale test"
     # End pbench Configuration
     #

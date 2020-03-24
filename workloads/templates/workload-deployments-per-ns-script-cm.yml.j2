@@ -11,6 +11,11 @@ data:
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
+      source /opt/pbench-agent/profile
+      # clear tools/remotes to make sure there are no invalid remotes
+      set +eo pipefail
+      pbench-clear-tools
+      set -eo pipefail
       echo "" > /var/lib/pbench-agent/tools-default/disk
       echo "" > /var/lib/pbench-agent/tools-default/iostat
       echo "workload" > /var/lib/pbench-agent/tools-default/label
@@ -32,7 +37,6 @@ data:
         echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
       done
     fi
-    source /opt/pbench-agent/profile
     echo "$(date -u) Done configuring pbench for Deployments per ns cluster limits test"
     # End pbench Configuration
 
