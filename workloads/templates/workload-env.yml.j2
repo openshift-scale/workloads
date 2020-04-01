@@ -77,6 +77,13 @@ data:
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
   CONFORMANCE_TEST_PREFIX: "{{conformance_test_prefix}}"
   AZURE_AUTH: "{{azure_auth|bool|lower}}"
+{% elif workload_job == "deployments-per-ns" %}
+  DEPLOYMENTS_PER_NS_TEST_PREFIX: "{{deployments_per_ns_test_prefix}}"
+  DEPLOYMENTS_PER_NS_CLEANUP: "{{deployments_per_ns_cleanup}}"
+  DEPLOYMENTS_PER_NS_BASENAME: "{{deployments_per_ns_basename}}"
+  DEPLOYMENTS_PER_NS_COUNT: "{{deployments_per_ns_count}}"
+  DEPLOYMENTS_PER_NS_POD_IMAGE: "{{deployments_per_ns_pod_image}}"
+  AZURE_AUTH: "{{azure_auth|bool|lower}}"
 {% elif workload_job == "namespaces-per-cluster" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
