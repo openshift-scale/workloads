@@ -862,6 +862,10 @@ data:
           key: test
           operator: Equal
           value: wlg
+        - effect: NoSchedule
+          key: role
+          operator: Equal
+          value: workload
         volumes:
         - configMap:
             items:
