@@ -50,6 +50,9 @@ nodevertical_pod_image: "{{ lookup('env', 'NODEVERTICAL_POD_IMAGE')|default('gcr
 nodevertical_stepsize: "{{ lookup('env', 'NODEVERTICAL_STEPSIZE')|default(50, true)|int }}"
 nodevertical_pause: "{{ lookup('env', 'NODEVERTICAL_PAUSE')|default(60, true)|int }}"
 nodevertical_ts_timeout: "{{ lookup('env', 'NODEVERTICAL_TS_TIMEOUT')|default(180, true)|int }}"
+nodevertical_heavy: "{{ lookup('env', 'NODEVERTICAL_HEAVY')|default(false, true)|bool|lower }}"
+nodevertical_heavy_probe_endpoint: "{{ lookup('env', 'NODEVERTICAL_HEAVY_PROBE_ENDPOINT')|default('/ready', true) }}"
+nodevertical_heavy_probe_period: "{{ lookup('env', 'NODEVERTICAL_HEAVY_PROBE_PERIOD')|default(30, true)|int }}"
 
 # Pass/fail criteria
 expected_nodevertical_duration: "{{ lookup('env', 'EXPECTED_NODEVERTICAL_DURATION')|default(600, true)|int }}"

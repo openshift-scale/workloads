@@ -1,0 +1,284 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scale-ci-workload-script
+data:
+  run.sh: |
+    #!/bin/sh
+    set -eo pipefail
+    workload_log() { echo "$(date -u) $@" >&2; }
+    export -f workload_log
+    export TOTAL_POD_COUNT=$((TOTAL_POD_COUNT / 2))
+    workload_log "Configuring pbench for NodeVertical"
+    mkdir -p /var/lib/pbench-agent/tools-default/
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
+      echo "" > /var/lib/pbench-agent/tools-default/disk
+      echo "" > /var/lib/pbench-agent/tools-default/iostat
+      echo "workload" > /var/lib/pbench-agent/tools-default/label
+      echo "" > /var/lib/pbench-agent/tools-default/mpstat
+      echo "" > /var/lib/pbench-agent/tools-default/oc
+      echo "" > /var/lib/pbench-agent/tools-default/perf
+      echo "" > /var/lib/pbench-agent/tools-default/pidstat
+      echo "" > /var/lib/pbench-agent/tools-default/sar
+      master_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/master= --no-headers | awk '{print $1}'`
+      for node in $master_nodes; do
+        echo "master" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      infra_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/infra= --no-headers | awk '{print $1}'`
+      for node in $infra_nodes; do
+        echo "infra" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+      worker_nodes=`oc get nodes -l pbench_agent=true,node-role.kubernetes.io/worker= --no-headers | awk '{print $1}'`
+      for node in $worker_nodes; do
+        echo "worker" > /var/lib/pbench-agent/tools-default/remote@$node
+      done
+    fi
+    source /opt/pbench-agent/profile
+    workload_log "Done configuring pbench NodeVertical"
+
+    workload_log "Configuring Heavy NodeVertical test"
+    envsubst < /root/workload/nodevertical-heavy.yaml.template > /tmp/nodevertical-heavy.yaml
+    cp /root/workload/nodevert-perf-app.yaml.template /tmp/nodevert-perf-app.yaml
+    workload_log "Done configuring Heavy NodeVertical test"
+
+    workload_log "Running Heavy NodeVertical workload"
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      pbench-user-benchmark -- sh /root/workload/workload.sh
+      result_dir="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -1)"/1/sample1
+      if [ "${ENABLE_PBENCH_COPY}" = "true" ]; then
+        pbench-copy-results --prefix ${NODEVERTICAL_TEST_PREFIX}
+      fi
+    else
+      sh /root/workload/workload.sh
+      result_dir=/tmp
+    fi
+    workload_log "Completed Heavy NodeVertical workload run"
+
+    workload_log "Checking Test Results"
+    workload_log "Checking Cluster Loader Exit Code"
+    if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
+      workload_log "Cluster Loader Failure"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Comparing Heavy NodeVertical duration to expected duration"
+    workload_log "Heavy NodeVertical Duration: $(jq '.duration' ${result_dir}/exit.json)"
+    if [ "$(jq '.duration>'${EXPECTED_NODEVERTICAL_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
+      workload_log "EXPECTED_NODEVERTICAL_DURATION (${EXPECTED_NODEVERTICAL_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
+      workload_log "Test Analysis: Failed"
+      exit 1
+    fi
+    workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"
+    # TODO: Check pbench-agent collected metrics for Pass/Fail
+    # TODO: Check prometheus collected metrics for Pass/Fail
+    workload_log "Test Analysis: Passed"
+  workload.sh: |
+    #!/bin/sh
+    set -o pipefail
+
+    result_dir=/tmp
+    if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
+      result_dir=${benchmark_results_dir}
+    fi
+    start_time=$(date +%s)
+    if [[ "${AZURE_AUTH}" == "true" ]]; then
+      export AZURE_AUTH_LOCATION=/tmp/azure_auth
+    fi
+    export cluster_name={{ snafu_cluster_name }}
+    export test_user={{ snafu_user }}
+    export es={{ snafu_es_host }}
+    export es_port={{ snafu_es_port }}
+    export es_index={{ snafu_es_index_prefix }}
+    VIPERCONFIG=/tmp/nodevertical-heavy.yaml python3 /tmp/snafu/run_snafu.py -t cl scale-ci --cl-output True --dir "${result_dir}" -p openshift-tests | tee "${result_dir}/clusterloader.txt"
+    exit_code=$?
+    end_time=$(date +%s)
+    duration=$((end_time-start_time))
+
+    workload_log "Writing Cluster Loader Exit Code"
+    jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
+    workload_log "Writing Cluster Loader Metrics to clusterloader.json"
+    grep "cluster_loader_marker" ${result_dir}/clusterloader.txt > "${result_dir}/clusterloader.json"
+
+    workload_log "Finished workload script"
+  nodevertical-heavy.yaml.template: |
+    provider: local
+    ClusterLoader:
+      cleanup: ${NODEVERTICAL_CLEANUP}
+      projects:
+        - num: 1
+          basename: ${NODEVERTICAL_BASENAME}
+          ifexists: delete
+          tuning: default
+          nodeselector: "node-role.kubernetes.io/worker="
+          templates:
+            - num: ${TOTAL_POD_COUNT}
+              file: nodevert-perf-app.yaml
+              parameters:
+                READINESS_ENDPOINT: ${NODEVERTICAL_HEAVY_PROBE_ENDPOINT}
+                READINESS_PERIOD: ${NODEVERTICAL_HEAVY_PROBE_PERIOD}
+      tuningsets:
+        - name: default
+          templates:
+            stepping:
+              stepsize: ${NODEVERTICAL_STEPSIZE}
+              pause: ${NODEVERTICAL_PAUSE}
+              timeout: ${NODEVERTICAL_TS_TIMEOUT}
+            rate_limit:
+              delay: 0
+  nodevert-perf-app.yaml.template: |
+    kind: Template
+    apiVersion: template.openshift.io/v1
+    labels:
+      template: perf-app
+    metadata:
+      name: perf-app
+    objects:
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: postgres-${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: postgres-${IDENTIFIER}
+          spec:
+            nodeSelector:
+              nodevertical: 'true'
+            containers:
+            - name: postgresql
+              image: registry.redhat.io/rhscl/postgresql-10-rhel7:latest
+              ports:
+              - containerPort: 5432
+                protocol: TCP
+              env:
+              - name: POSTGRESQL_USER
+                value: ${POSTGRESQL_USER}
+              - name: POSTGRESQL_PASSWORD
+                value: ${POSTGRESQL_PASSWORD}
+              - name: POSTGRESQL_DATABASE
+                value: ${POSTGRESQL_DATABASE}
+              resources: {}
+              imagePullPolicy: Always
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 1
+        selector:
+          name: postgres-${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    - kind: DeploymentConfig
+      apiVersion: v1
+      metadata:
+        name: perfapp-${IDENTIFIER}
+      spec:
+        template:
+          metadata:
+            labels:
+              name: perfapp-${IDENTIFIER}
+          spec:
+            nodeSelector:
+              nodevertical: 'true'
+            containers:
+            - name: perfapp
+              image: quay.io/rsevilla/perfapp:latest
+              readinessProbe:
+                httpGet:
+                  path: ${READINESS_ENDPOINT}
+                  port: 8080
+                periodSeconds: {{ '${{READINESS_PERIOD}}' }}
+                failureThreshold: 1
+                timeoutSeconds: 60
+                initialDelaySeconds: 30
+              ports:
+              - containerPort: 8080
+                protocol: TCP
+              env:
+              - name: POSTGRESQL_USER
+                value: ${POSTGRESQL_USER}
+              - name: POSTGRESQL_PASSWORD
+                value: ${POSTGRESQL_PASSWORD}
+              - name: POSTGRESQL_DATABASE
+                value: ${POSTGRESQL_DATABASE}
+              - name: POSTGRESQL_HOSTNAME
+                value: postgresql-${IDENTIFIER}
+              - name: POSTGRESQL_PORT
+                value: '5432'
+              - name: POSTGRESQL_RETRY_INTERVAL
+                value: ${POSTGRESQL_RETRY_INTERVAL}
+              resources: {}
+              imagePullPolicy: Always
+              capabilities: {}
+              securityContext:
+                capabilities: {}
+                privileged: false
+            restartPolicy: Always
+            serviceAccount: ''
+        replicas: 1
+        selector:
+          name: perfapp-${IDENTIFIER}
+        triggers:
+        - type: ConfigChange
+        strategy:
+          type: Rolling
+    - kind: Service
+      apiVersion: v1
+      metadata:
+        name: postgresql-${IDENTIFIER}
+      spec:
+        selector:
+          name: postgres-${IDENTIFIER}
+        ports:
+        - protocol: TCP
+          port: 5432
+          targetPort: 5432
+        portalIP: ''
+        type: ClusterIP
+        sessionAffinity: None
+      status:
+        loadBalancer: {}
+    - kind: Service
+      apiVersion: v1
+      metadata:
+        name: perfapp-${IDENTIFIER}
+      spec:
+        selector:
+          name: perfapp-${IDENTIFIER}
+        ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: 8080
+        portalIP: ''
+        type: ClusterIP
+        sessionAffinity: None
+      status:
+        loadBalancer: {}
+    parameters:
+    - name: IDENTIFIER
+      description: Number to append to the name of resources
+      value: '1'
+    - name: POSTGRESQL_USER
+      description: Postgresql database username
+      value: 'admin'
+    - name: POSTGRESQL_PASSWORD
+      description: Postgresql database password
+      value: 'secret'
+    - name: POSTGRESQL_DATABASE
+      description: Postgresql database name
+      value: 'mydb'
+    - name: POSTGRESQL_RETRY_INTERVAL
+      description: Postgresql connection retry interval
+      value: '5'
+    - name: READINESS_ENDPOINT
+      description: Readiness probe endpoint
+      value: '/ready'
+    - name: READINESS_PERIOD
+      description: Readiness probe period
+      value: '30'

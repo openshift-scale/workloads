@@ -89,6 +89,10 @@
           when: cluster_name is succeeded
       when: snafu_cluster_name == ""
 
+    - name: Set NodeVertical template
+      set_fact:
+        nodevertical_template: "{% if nodevertical_heavy %}workload-nodevertical-heavy-script-cm.yml.j2{% else %}workload-nodevertical-script-cm.yml.j2{% endif %}"
+
     - name: Template workload templates
       template:
         src: "{{item.src}}"
@@ -105,7 +109,7 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-env.yml"
-        - src: workload-nodevertical-script-cm.yml.j2
+        - src: "{{ nodevertical_template }}"
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-nodevertical-script-cm.yml"
 
 

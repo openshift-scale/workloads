@@ -51,6 +51,8 @@ data:
   NODEVERTICAL_TS_TIMEOUT: "{{nodevertical_ts_timeout}}"
   EXPECTED_NODEVERTICAL_DURATION: "{{expected_nodevertical_duration}}"
   AZURE_AUTH: "{{azure_auth|bool|lower}}"
+  NODEVERTICAL_HEAVY_PROBE_ENDPOINT: "{{ nodevertical_heavy_probe_endpoint }}"
+  NODEVERTICAL_HEAVY_PROBE_PERIOD: "{{ nodevertical_heavy_probe_period }}"
 {% elif workload_job == "podvertical" %}
   PBENCH_INSTRUMENTATION: "{{pbench_instrumentation|bool|lower}}"
   ENABLE_PBENCH_COPY: "{{enable_pbench_copy|bool|lower}}"
