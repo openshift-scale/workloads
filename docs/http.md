@@ -135,6 +135,34 @@ HTTP workload generator container image.
 Default: `quay.io/openshift-scale/nginx`  
 HTTP server container image.
 
+### ES_SERVER
+Default: *empty*     
+Public elasticsearch server.
+
+### ES_PORT
+Default: *empty*    
+Port number for public elasticsearch server.
+
+### COMPARE_RESULTS
+Default: *empty*     
+To compare two similar runs, export this variable.
+
+### COMPARISON_TOLERANCE
+Default: *empty*   
+Accepted deviation in percentage when compared to a baseline run.
+
+### BASELINE_RESULTS_TARBALL
+Default: *empty*    
+Link to tarball on a public instance which serves as a baseline for the test run. Pbench tarballs are internal to RHT, copy them to a public instance.
+
+### EMAIL_ID_FOR_RESULTS_SHEET
+Default: *empty*     
+Email Id to which the results in google spreadsheet will be mailed
+
+### GSHEET_KEY
+Default: *empty*       
+The service account key for communicating with Google API. 
+Note: Please pad the key i.e " will be backslash" and \n will be backslash\n
 
 ## Suggested configurations
 

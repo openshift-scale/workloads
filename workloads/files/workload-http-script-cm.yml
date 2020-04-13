@@ -41,18 +41,19 @@ data:
 
     # Test Configuration
     log "Configuring HTTP test"
+    echo $GSHEET_KEY > /tmp/gsheet_key.json
     test_dir=/tmp/http-ci-tests
     mkdir -p $test_dir/content/quickstarts/{nginx,stress}
     install -m 644 /root/workload/server-*.yaml $test_dir/content/quickstarts/nginx
     install -m 644 /root/workload/stress-*.yaml $test_dir/content/quickstarts/stress
     install -m 755 /root/workload/*.sh $test_dir
     set -a
-    HOME=$test_dir			# When running unprivileged, make sure we can write to our HOME
-    KUBECONFIG=/root/.kube/config	# Hard-coded kubeconfig by workload-job.yml.j2
-    PBENCH_USE=true			# Always use pbench as a wrapper to move results to a pbench server
-    PBENCH_SCRAPER_USE=false		# Do not use pbench scraper for r2r analysis
-    PBENCH_CLEAR_RESULTS=true		# Clear results from previous pbench runs
-    PBENCH_MOVE_RESULTS=true		# Move the benchmark results to a pbench server
+    HOME=$test_dir                      # When running unprivileged, make sure we can write to our HOME
+    KUBECONFIG=/root/.kube/config       # Hard-coded kubeconfig by workload-job.yml.j2
+    PBENCH_USE=true                     # Always use pbench as a wrapper to move results to a pbench server
+    PBENCH_SCRAPER_USE=false            # Do not use pbench scraper for r2r analysis
+    PBENCH_CLEAR_RESULTS=true           # Clear results from previous pbench runs
+    PBENCH_MOVE_RESULTS=true            # Move the benchmark results to a pbench server
     HTTP_TEST_SERVER_RESULTS=${HTTP_TEST_SERVER_RESULTS:-kcp://scale-ci-tooling/${OCP_POD_NAME}:/var/lib/pbench-agent}
     set +a
     # End Test Configuration
@@ -130,22 +131,22 @@ data:
     . ./env.sh
 
     ### Global variables ###########################################################
-    param_name=()			# parameters, name
-    param_fn=()			# parameters, function name
-    param_hlp=()			# parameters, help
-    http_pod_label=test=http	# label for application pods
-    http_server=nginx		# backend server for http tests (h2o|nginx)
-    declare -a a_region		# array of old node region labels
+    param_name=()                       # parameters, name
+    param_fn=()                         # parameters, function name
+    param_hlp=()                        # parameters, help
+    http_pod_label=test=http            # label for application pods
+    http_server=nginx                   # backend server for http tests (h2o|nginx)
+    declare -a a_region                 # array of old node region labels
 
     # pbench-specific variables ####################################################
     wlg_run=./wlg-run.sh
     wlg_run_pbench=./wlg-run-pbench.sh
     file_total_rps=rps.txt
     file_total_latency=latency_95.txt
-    file_quit=quit				# if this file is detected during test runs, abort
+    file_quit=quit                      # if this file is detected during test runs, abort
 
     # mb-specific variables ########################################################
-    routes_file=routes.txt		# a file with routes to pass to cluster loader
+    routes_file=routes.txt              # a file with routes to pass to cluster loader
 
     ### Functions ##################################################################
     fail() {
@@ -397,10 +398,10 @@ data:
     cl_load() {
       local server_quickstart_dir="content/quickstarts/$http_server"
       local templates="$server_quickstart_dir/server-http.yaml $server_quickstart_dir/server-tls-edge.yaml $server_quickstart_dir/server-tls-passthrough.yaml $server_quickstart_dir/server-tls-reencrypt.yaml"
-      local projects=${HTTP_TEST_APP_PROJECTS:-10}		# 10, 30, 60, 180
+      local projects=${HTTP_TEST_APP_PROJECTS:-10}              # 10, 30, 60, 180
       local project_start=1
-      local templates_total=${HTTP_TEST_APP_TEMPLATES:-50}	# number of templates per project
-      local templates_start=1			# do not change or read the code to make sure it does what you want
+      local templates_total=${HTTP_TEST_APP_TEMPLATES:-50}      # number of templates per project
+      local templates_start=1                                   # do not change or read the code to make sure it does what you want
 
       local project project_basename template p p_f i i_f
 
@@ -455,9 +456,9 @@ data:
     benchmark_run() {
       local routes routes_f delay_f mb_conns_per_target conns_per_thread_f ka_f now benchmark_test_config
       local router_term mb_targets load_generator_nodes
-      local run_log=run.log			# a log file for non-pbench runs
-      local ret				# return value
-      local benchmark_iteration_sleep=30	# sleep for some time between test iterations
+      local run_log=run.log                     # a log file for non-pbench runs
+      local ret                                 # return value
+      local benchmark_iteration_sleep=30        # sleep for some time between test iterations
       local mb_tls_session_reuse=n
 
       rm -f $run_log
@@ -473,7 +474,7 @@ data:
       # For the purposes of CI, use "mix" only
       for route_term in ${HTTP_TEST_ROUTE_TERMINATION//,/ } ; do
         case $route_term in
-          mix) mb_targets="(http|edge|passthrough|reencrypt)-0.1[.] (http|edge|passthrough|reencrypt)-0.[0-9][.]"	# don't use "\.", issues with yaml files
+          mix) mb_targets="(http|edge|passthrough|reencrypt)-0.1[.] (http|edge|passthrough|reencrypt)-0.[0-9][.]"       # don't use "\.", issues with yaml files
           ;;
           http) mb_targets="http-0.[0-9][.]"
           ;;
@@ -541,7 +542,7 @@ data:
                       HTTP_TEST_SERVER_RESULTS="${HTTP_TEST_SERVER_RESULTS:0:6}${server_results}:${server_results_dir%/}${abs_path_prefix}$benchmark_test_config"
                     }
 
-    		$wlg_run 2>&1 || die $? "Test iteration failed with exit code: $?"
+                $wlg_run 2>&1 || die $? "Test iteration failed with exit code: $?"
                   fi
 
                   ret=$?
@@ -551,7 +552,7 @@ data:
                 done
               done
             done
-          done	# HTTP_TEST_MB_DELAY
+          done  # HTTP_TEST_MB_DELAY
         done
       done # route_term
     }
@@ -564,7 +565,8 @@ data:
       local archive_name=http-$now-${HTTP_TEST_SUFFIX}
       local results_dir=$(results_dir_get)
       local out_dir=$results_dir/$archive_name
-
+      uuid=$(cat /proc/sys/kernel/random/uuid)
+      echo "UUID -> $uuid"
       test "${HTTP_TEST_SERVER_RESULTS}" || return 0
 
       rm -rf $out_dir
@@ -587,11 +589,43 @@ data:
         mkdir -p $target_dir
         if test "$total_rps" != 0 ; then
           printf "%s\n" "$total_rps" >> $target_dir/$file_total_rps
+          export -p routes=$routes_f
+          export -p test_type=$route_term
+          export -p conn_per_targetroute=$conns_per_thread_f
+          export -p keepalive=$ka_f
+          export -p delay=$delay_f
+          export -p tls_reuse=$tlsru_f
+          export -p runtime=$run_time_f
+          export -p requests_per_second=$total_rps
+          export -p uuid=$uuid
+          echo "*******"
+          echo "Requests per Second =" $total_rps
+          echo "*******"
         fi
         if test "$total_latency_95" ; then
           printf "%s\n" "$total_latency_95" >> $target_dir/$file_total_latency
+          export -p latency_95pctl=$total_latency_95
+          echo "95th Percentile Latency =" $total_latency_95
+          echo "*******"
+          if [ $ES_SERVER ] && [ $ES_PORT ] ; then 
+            python3 /root/workload/http_wrapper.py
+          fi
         fi
       done
+      set -x
+      if [ $COMPARE_RESULTS ]; then
+        comparison_tolerance=5
+        if [[ $COMPARISON_TOLERANCE ]]; then
+          comparison_tolerance=$COMPARISON_TOLERANCE
+        fi
+        mkdir /tmp/baseline_results
+        curl $BASELINE_RESULTS_TARBALL | tar -xJ -C /tmp/baseline_results/ --strip-components 1
+        python3 /root/workload/gsheets.py --dirname /tmp/baseline_results $out_dir --tolerance=$comparison_tolerance
+      else
+        python3 /root/workload/gsheets.py --dirname $out_dir
+      fi
+      set +x
+      cp /tmp/http-ci-tests/results.csv $dir/
       # Tar-up the post-processed results and place them into the last directory (alphabetical sort)
       tar Jcvf $dir/${archive_name}.tar.xz -C $results_dir $archive_name
       echo "Processed results stored to: $dir"
@@ -618,7 +652,7 @@ data:
       # a user might not have the privileges to do selector-based namespace deletion, go through his/her projects and
       # do a project-name cleanup
       oc get projects -o template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | \
-        grep -E '^server-(http|tls-(edge|passthrough|reencrypt))-[0-9]+$' | xargs oc delete project
+        grep -E '^server-(http|tls-(edge|passthrough|reencrypt))-[0-9]+$' | xargs oc delete --wait=true project
     }
 
     main() {
@@ -649,7 +683,7 @@ data:
       shift
     done
 
-    test "$1" || usage 1	# no parameters passed
+    test "$1" || usage 1        # no parameters passed
 
     # parameter/task processing
     while test "$1" ; do
@@ -760,7 +794,7 @@ data:
       oc new-project $http_stress_ns --skip-config-write
       oc_create_env || \
         die 1 "Cannot create environment ConfigMap for WLG pod(s)."
-      oc get cm wlg-env --template '{{printf "%s\n" .data}}' -n=$http_stress_ns	# Print some debugging information for the WLG pod
+      oc get cm wlg-env --template '{{printf "%s\n" .data}}' -n=$http_stress_ns # Print some debugging information for the WLG pod
       oc create cm wlg-targets --from-file=wlg-targets=./routes.txt -n=$http_stress_ns || \
         die 1 "Cannot create wlg-targets ConfigMap for WLG pod(s)."
       oc create secret generic wlg-ssh-key --from-file=wlg-ssh-key=$HTTP_TEST_SERVER_RESULTS_SSH_KEY -n=$http_stress_ns || \
@@ -1245,3 +1279,250 @@ data:
     - description: HTTP server container image
       name: HTTP_TEST_SERVER_CONTAINER_IMAGE
       value: 'quay.io/openshift-scale/nginx'
+
+
+  gsheets.py: |
+
+        #!/bin/python
+
+        import os
+        import gspread
+        from collections import defaultdict
+        from oauth2client.service_account import ServiceAccountCredentials
+        import csv
+        import sys
+        import re
+        import argparse
+        import datetime
+        from gspread_formatting import *
+
+
+        def parse_results(results_directory, result_dict):
+            for root, dirs, files in os.walk(results_directory):
+                dirs.sort(reverse=True)
+                for file in files:
+                    if "rps" in file:
+                        key = "rps"
+                    if "latency" in file:
+                        key = "latency_95"
+                    file_to_open = f"{root}/{key}.txt"
+                    with open(file_to_open, "r") as f:
+                        val = f.read()
+                    iter_dict = result_dict
+                    for p in root.split(os.sep)[-4:]:
+                        iter_dict = iter_dict.setdefault(p, defaultdict(dict))
+                    iter_dict.setdefault(results_directory, defaultdict(lambda: "NaN"))
+                    iter_dict[results_directory][key] = float(val.strip())
+
+
+        def generate_csv(file_name, results):
+            with open("results.csv", "w", newline="") as csvfile:
+                w = csv.writer(csvfile, delimiter=",", quotechar='"')
+                create_structure(results, w)
+
+
+        def create_structure(results, w):
+            test_types = [
+                "processed-mix",
+                "processed-reencrypt",
+                "processed-passthrough",
+                "processed-edge",
+                "processed-http",
+            ]
+            level_header = {0: "Test Type", 1: "No. of routes", 2: "Conns/Route"}
+            stack = [(k, 0, results[k]) for k in test_types if k in results]
+
+            while stack:
+                curr_node, depth, dictionary = stack.pop()
+                w.writerow([" "] * depth + [level_header[depth]])
+                w.writerow([" "] * depth + [regexp.match(curr_node).group(1) or curr_node])
+                if "ka" not in list(dictionary.keys())[0]:
+                    stack_extension = [(k, depth + 1, dictionary[k]) for k in dictionary.keys()]
+                    stack.extend(stack_extension)
+                else:
+                    print_tables(dictionary, depth + 1, w)
+
+
+        def print_tables(table_dictionary, offset, w):
+            keepalive_counts = list(table_dictionary.keys())
+            keepalive_counts.reverse()
+            result_names = list(table_dictionary[keepalive_counts[0]].keys())
+            result_types = list(table_dictionary[keepalive_counts[0]][result_names[0]].keys())
+            row_offset = [" "] * (offset + 1)
+            for result_type in result_types:
+                if result_type == "latency_95":
+                    latency_flag = True
+                else:
+                    latency_flag = False
+                w.writerow(row_offset[1:] + [result_type])
+                if "COMPARE_RESULTS" in os.environ and os.environ["COMPARE_RESULTS"]:
+                    w.writerow(
+                        row_offset + ["Keepalive Count"] + ["Baseline Results"] + [os.environ['HTTP_TEST_SUFFIX']] + [" "] + ["Percent Change", f"P/F (stdev={params.tolerance[0]}%)"]
+                    )
+                else:
+                    w.writerow(
+                        row_offset + ["Keepalive Count"] + [os.environ['HTTP_TEST_SUFFIX']]
+                    )
+                for keepalive_count in keepalive_counts:
+                    row = row_offset + [regexp.match(keepalive_count).group(1) or keepalive_count]
+                    for result_name in result_names:
+                        row.append(table_dictionary[keepalive_count][result_name][result_type])
+                    if "COMPARE_RESULTS" in os.environ and os.environ["COMPARE_RESULTS"]:   # Pass/Fail, only for last two columns of results
+                        row.append(" ")
+                        row.append("%.1f%%" % percent_change(float(row[-2]), float(row[-3])))
+                        row.append(
+                            get_pass_fail(
+                                float(row[-3]), float(row[-4]), int(params.tolerance[0]), latency_flag,
+                            )
+                        )
+                    w.writerow(row)
+
+        def percent_change(value, reference):
+            if reference:
+                return ((value - reference) * 1.0 / reference) * 100
+            else:
+                return -1
+
+
+        def get_pass_fail(val, ref, tolerance, ltcy_flag):
+            percent_diff = abs(percent_change(val, ref))
+            if val < ref and percent_diff > tolerance:
+                if ltcy_flag:
+                    return "Pass"
+                else:
+                    return "Fail"
+            elif val > ref and percent_diff > tolerance:
+                if ltcy_flag:
+                    return "Fail"
+                else:
+                    return "Pass"
+            else:
+                return "Pass"
+
+
+
+        def push_to_gsheet(csv_file_name, google_svc_acc_key, email_id):
+            fmt = cellFormat(
+                horizontalAlignment="RIGHT"
+            )
+            scope = [
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                f"/tmp/{google_svc_acc_key}", scope
+            )
+            gc = gspread.authorize(credentials)
+            sh = gc.create(params.sheetname)  # Specify name of the Spreadsheet
+            sh.share(email_id, perm_type="user", role="writer")
+            spreadsheet_id = sh.id
+            spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{sh.id}"
+            print(f"\n         Spreadsheet URL -> {spreadsheet_url}\n")
+            with open(csv_file_name, "r") as f:
+                gc.import_csv(spreadsheet_id, f.read())
+            worksheet = sh.get_worksheet(0)
+            format_cell_range(worksheet, "1:1000", fmt)
+
+        # Main
+        now = datetime.datetime.today()
+        timestamp = now.strftime("%Y-%m-%d-%H.%M.%S")
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--tolerance",
+            help="Accepted deviation (+/-) from the reference result",
+            nargs=1,
+            required=False,
+            dest="tolerance",
+            default="5",
+        )
+        parser.add_argument(
+            "--sheetname",
+            help="Google Spreadsheet name",
+            nargs=1,
+            required=False,
+            dest="sheetname",
+            default=f"router-test-results-{str(timestamp)}-{os.environ['HTTP_TEST_SUFFIX']}",
+        )
+        parser.add_argument(
+            "--dirname",
+            help="Directory name were results are stored",
+            nargs="+",
+            required=True,
+            dest="dir_name",
+        )
+        params = parser.parse_args()
+        regexp = re.compile(r"^([0-9]*)[a-z]*")
+        results = defaultdict(dict)
+        if "COMPARE_RESULTS" in os.environ and os.environ["COMPARE_RESULTS"]:
+            result_dirs = [params.dir_name[0], params.dir_name[1]]  # Specify the directories
+        else:
+            result_dirs = [params.dir_name[0]]  # Specify the directories
+        for result_dir in result_dirs:
+            parse_results(result_dir, results)
+        generate_csv("", results)
+        if "EMAIL_ID_FOR_RESULTS_SHEET" in os.environ and os.environ["EMAIL_ID_FOR_RESULTS_SHEET"]:
+            push_to_gsheet(
+                "results.csv", "gsheet_key.json", os.environ["EMAIL_ID_FOR_RESULTS_SHEET"],
+            )
+
+
+  http_wrapper.py: |
+    
+    import elasticsearch
+    import os
+    import sys
+    import datetime
+    import string 
+    import random
+
+    def _json_payload(uuid, test_type, test_name, routes, conn_per_targetroute, keepalive, tls_reuse, delay, runtime, requests_per_second, latency_95pctl, timestamp_newyork, num_workload_generators):
+        processed = []
+        processed.append({
+            "uuid" : uuid,
+            "test_type" : test_type,
+            "test_name" : test_name,
+            "routes" : routes,
+            "conn_per_targetroute" : conn_per_targetroute,
+            "keepalive" : keepalive,
+            "tls_reuse" : tls_reuse,
+            "delay" : delay,
+            "runtime" : runtime,
+            "requests_per_second" : requests_per_second,
+            "latency_95pctl" : latency_95pctl,
+            "num_workload_generators" : num_workload_generators,
+            "timestamp_newyork" : timestamp_newyork
+        })
+        return processed
+
+    def _index_result(index, server, port, payload):
+        _es_connection_string = str(server) + ':' + str(port)
+        es = elasticsearch.Elasticsearch([_es_connection_string], send_get_body_as='POST')
+        for result in payload:
+            es.index(index=index, body=result)
+
+    def main():
+        
+        server = os.environ["ES_SERVER"]
+        port = os.environ["ES_PORT"]
+        test_name = os.environ["HTTP_TEST_SUFFIX"]
+        test_type = os.environ["test_type"]
+        routes = os.environ["routes"]
+        conn_per_targetroute = os.environ["conn_per_targetroute"]
+        keepalive = os.environ["keepalive"]
+        tls_reuse = os.environ["tls_reuse"]
+        delay = os.environ["delay"]
+        runtime = os.environ["runtime"]
+        requests_per_second = os.environ["requests_per_second"]
+        latency_95pctl = os.environ["latency_95pctl"]
+        uuid = os.environ["uuid"]
+        num_workload_generators = os.environ["HTTP_TEST_LOAD_GENERATORS"] 
+        timestamp_newyork = datetime.datetime.now()
+        
+        documents = _json_payload(uuid, test_type, test_name, routes, conn_per_targetroute, keepalive, tls_reuse, delay, runtime, requests_per_second, latency_95pctl, timestamp_newyork, num_workload_generators)
+        if len(documents) > 0:
+            _index_result("router-test-results", server, port, documents)
+
+
+    if __name__ == '__main__':
+        sys.exit(main())
+

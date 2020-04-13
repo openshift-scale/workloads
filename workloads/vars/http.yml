@@ -28,6 +28,13 @@ job_completion_poll_attempts: "{{ lookup('env', 'JOB_COMPLETION_POLL_ATTEMPTS')|
 
 # HTTP workload specific parameters
 http_env_vars: [
+  "ES_SERVER",
+  "ES_PORT",
+  "EMAIL_ID_FOR_RESULTS_SHEET",
+  "GSHEET_KEY",
+  "COMPARE_RESULTS",
+  "BASELINE_RESULTS_TARBALL",
+  "COMPARISON_TOLERANCE",
   "HTTP_TEST_SUFFIX",
   "HTTP_TEST_LOAD_GENERATORS",
   "HTTP_TEST_LOAD_GENERATOR_NODES",
