@@ -301,8 +301,15 @@ data:
       local oc_whoami=`oc whoami`
 
       test "$HTTP_TEST_LOAD_GENERATOR_NODES" || {
-        echo "Not (un)labelling nodes, load generator nodes unspecified."
-        return 0
+        echo "Load generator nodes unspecified."
+        if [ $HTTP_TEST_LOAD_GENERATORS -eq 1 ] ; then
+          HTTP_TEST_LOAD_GENERATOR_NODES=$(oc get nodes --no-headers | grep "workload" |  awk '{print $1}')
+          test "$HTTP_TEST_LOAD_GENERATOR_NODES" || {
+            return 0
+          }
+        else
+          return 0
+        fi
       }
 
       check_admin || {
