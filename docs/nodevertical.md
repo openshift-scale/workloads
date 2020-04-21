@@ -150,8 +150,31 @@ Period of time (in seconds) that cluster loader will wait for pods to come up to
 Default: `600`  
 Pass/fail criteria. Value to determine if NodeVertical workload executed in duration expected.
 
-## Smoke test variables
+### NODEVERTICAL_HEAVY
+Default: `false`
+Trigger nodevertical heavy workload. Rather than deploy sleep pods throughout all labeled nodes, this workload deploys a two layer application composed by a PostgreSQL database pod and another pod wih simple application that is able to perform several operations and store a result in the database. [Heavy node vertical app](https://github.com/rsevilla87/perfApp)
 
+### NODEVERTICAL_HEAVY_PROBE_ENDPOINT
+Default: `/ready`
+Readiness probe endpoint for the application deployed by the heavy nodevertical. The default `/ready` endpoint inserts a record with the current timestamp in the ts table of the DDBB. i.e. `INSERT INTO ts VALUES ('2006-01-02T15:04:05Z07:00')`
+
+Be aware that using nodevertical heavy has an extra resource consumption compared with the standard workload, 
+the following capture provides an idea about how much resources are required to run it.
+
+Results obtained from running 250 pods (client + database) with the default `/ready` endpoint.
+```
+root@ip-172-31-76-65: ~ # oc adm top nodes -l nodevertical=true
+NAME                                        CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+ip-10-0-143-79.us-west-2.compute.internal   755m         10%    8495Mi          28%       
+ip-10-0-155-81.us-west-2.compute.internal   732m         9%     8810Mi          29%       
+ip-10-0-166-82.us-west-2.compute.internal   753m         10%    9116Mi          30%  
+```
+
+### NODEVERTICAL_HEAVY_PROBE_PERIOD
+Default: `30`
+Readiness probe period for the application deployed by the heavy nodevertical.
+
+## Smoke test variables
 ```
 NODEVERTICAL_NODE_COUNT=4
 NODEVERTICAL_TEST_PREFIX=nodevertical_smoke

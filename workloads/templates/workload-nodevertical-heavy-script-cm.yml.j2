@@ -134,8 +134,8 @@ data:
     metadata:
       name: perf-app
     objects:
-    - kind: DeploymentConfig
-      apiVersion: v1
+    - kind: Deployment
+      apiVersion: apps/v1
       metadata:
         name: postgres-${IDENTIFIER}
       spec:
@@ -169,13 +169,14 @@ data:
             serviceAccount: ''
         replicas: 1
         selector:
-          name: postgres-${IDENTIFIER}
+          matchLabels:
+            name: postgres-${IDENTIFIER}
         triggers:
         - type: ConfigChange
         strategy:
-          type: Rolling
-    - kind: DeploymentConfig
-      apiVersion: v1
+          type: RollingUpdate
+    - kind: Deployment
+      apiVersion: apps/v1
       metadata:
         name: perfapp-${IDENTIFIER}
       spec:
@@ -223,11 +224,12 @@ data:
             serviceAccount: ''
         replicas: 1
         selector:
-          name: perfapp-${IDENTIFIER}
+          matchLabels:
+            name: perfapp-${IDENTIFIER}
         triggers:
         - type: ConfigChange
         strategy:
-          type: Rolling
+          type: RollingUpdate
     - kind: Service
       apiVersion: v1
       metadata:

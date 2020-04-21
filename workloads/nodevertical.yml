@@ -91,7 +91,7 @@
 
     - name: Set NodeVertical template
       set_fact:
-        nodevertical_template: "{% if nodevertical_heavy %}workload-nodevertical-heavy-script-cm.yml.j2{% else %}workload-nodevertical-script-cm.yml.j2{% endif %}"
+        nodevertical_template: "{% if nodevertical_heavy|bool %}workload-nodevertical-heavy-script-cm.yml.j2{% else %}workload-nodevertical-script-cm.yml.j2{% endif %}"
 
     - name: Template workload templates
       template:
