@@ -76,18 +76,14 @@
         echo "$(( {{nodevertical_maxpods}}-pod_count ))"
       register: total_pod_count
 
-    - name: Block to set clustername
-      block:
-        - name: Get cluster name
-          shell: |
-            {%raw%}oc get machineset -n openshift-machine-api -o=go-template='{{index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster"}}'{%endraw%}
-          register: cluster_name
+    - name: Set cluster details
+      include_role:
+        name: cluster_details
 
-        - name: Create tooling service account
-          set_fact:
-            snafu_cluster_name: cluster_name.stdout
-          when: cluster_name is succeeded
-      when: snafu_cluster_name == ""
+    - name: Collect pprof
+      include_role:
+        name: pprof-collection
+      when: pprof_collect and pprof_collect != ""
 
     - name: Set NodeVertical template
       set_fact:

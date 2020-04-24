@@ -44,7 +44,13 @@ data:
     envsubst < /root/workload/nodevertical.yaml.template > /tmp/nodevertical.yaml
     envsubst < /root/workload/nodevert-pod-labeled.yaml.template > /tmp/nodevert-pod-labeled.yaml
     workload_log "Done configuring NodeVertical test"
-
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Configuring conprof"
+      envsubst < /root/workload/conprof.yaml.template > /tmp/conprof.yaml
+      envsubst < /root/workload/conprof_start.sh > /tmp/conprof_start.sh
+      envsubst < /root/workload/conprof_stop.sh > /tmp/conprof_stop.sh
+      workload_log "Done configuring conprof"
+    fi
     workload_log "Running NodeVertical workload"
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       pbench-user-benchmark -- sh /root/workload/workload.sh
@@ -76,11 +82,23 @@ data:
     # TODO: Check pbench-agent collected metrics for Pass/Fail
     # TODO: Check prometheus collected metrics for Pass/Fail
     workload_log "Test Analysis: Passed"
+  conprof_start.sh: |
+    #!/bin/sh
+    set -o pipefail
+    nohup /usr/bin/conprof all --config.file /tmp/conprof.yaml --log.level=debug --storage.tsdb.path=/tmp/data &>/tmp/conprof.log &
+  conprof_stop.sh: |
+    #!/bin/sh
+    set -o pipefail
+    pkill conprof
   workload.sh: |
     #!/bin/sh
     set -o pipefail
 
     result_dir=/tmp
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Starting conprof"
+      bash /tmp/conprof_start.sh
+    fi
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       result_dir=${benchmark_results_dir}
     fi
@@ -98,6 +116,14 @@ data:
     end_time=$(date +%s)
     duration=$((end_time-start_time))
 
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Stopping conprof"
+      bash /tmp/conprof_stop.sh
+      cp /tmp/conprof.log ${result_dir}/conprof.log
+      cp /tmp/conprof.yaml ${result_dir}/conprof.yaml
+      tar -czvf ${result_dir}/conprof.tar.gz /tmp/data/
+      workload_log "copied conprof tarballs and log"
+    fi
     workload_log "Writing Cluster Loader Exit Code"
     jq -n '. | ."exit_code"='${exit_code}' | ."duration"='${duration}'' > "${result_dir}/exit.json"
     workload_log "Writing Cluster Loader Metrics to clusterloader.json"
@@ -147,3 +173,121 @@ data:
           privileged: false
       nodeSelector:
         nodevertical: 'true'
+  conprof.yaml.template: |
+    scrape_configs:
+    - job_name: 'apiserver0'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver0-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          cmdline:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'apiserver1'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver1-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          cmdline:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'apiserver2'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver2-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          cmdline:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'prometheus'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['prometheus-k8s-openshift-monitoring.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: false
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          cmdline:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false

@@ -1,0 +1,33 @@
+---
+- name: Get cluster name
+  shell: |
+    {%raw%}oc get machineset -n openshift-machine-api -o=go-template='{{index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster"}}'{%endraw%}
+  register: cluster_name
+
+- name: get install config
+  shell: oc get configmap -n kube-system -o=jsonpath='{.items[?(@.metadata.name=="cluster-config-v1")].data.install-config}'
+  register: install_config
+
+- name: setting cluster name
+  set_fact:
+    install_json: "{{ install_config.stdout | from_yaml }}"
+
+- name: clustername(minus id)
+  set_fact:
+    clustername: "{{ install_json.metadata.name }}"
+
+- name: set basedomain
+  set_fact:
+    base_domain: "{{ install_json.baseDomain }}"
+
+- name: Block to set clustername
+  block:
+    - name: set snafu_cluster_name to clustername
+      set_fact:
+        snafu_cluster_name: clustername
+
+    - name: overwrite snafu cluster name to cluster_name.stdout if succeeded
+      set_fact:
+        snafu_cluster_name: cluster_name.stdout
+      when: cluster_name is succeeded
+  when: snafu_cluster_name is defined and snafu_cluster_name== ""

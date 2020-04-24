@@ -1,0 +1,42 @@
+---
+- name: get kubeapiserver pods
+  shell: |
+    {%raw%}oc get pods -l app=openshift-kube-apiserver -n openshift-kube-apiserver  -o=jsonpath='{.items[*].metadata.name}'{%endraw%}
+  register: kubeapiserverpods
+
+- name: create routes on pod
+  block:
+    - name: label pod
+      shell: "oc -n openshift-kube-apiserver label pod {{ item }} apiserver{{ ansible_loop.index0 }}= --overwrite"
+      loop: "{{ kubeapiserverpods.stdout.split(' ') }}"
+      loop_control:
+        extended: yes
+
+    - name: get curent existing routes
+      shell: "oc -n openshift-kube-apiserver get route | grep apiserver | wc -l"
+      register: current_route
+
+    - name: create route to access pprof on pod
+      shell: "oc -n openshift-kube-apiserver expose pod {{ item }} --name=apiserver{{ ansible_loop.index0 }} && oc -n openshift-kube-apiserver create route passthrough --service=apiserver{{ ansible_loop.index0 }}"
+      loop: "{{ kubeapiserverpods.stdout.split(' ') }}"
+      loop_control:
+        extended: yes
+      when: current_route.stdout|int == 0
+  when: "{{ kubeapiserverpods.stdout.split(' ')|length }} == 3"
+
+- name: check sa for apiserver-pprof
+  shell: "oc get sa -n openshift-kube-apiserver | grep apiserver-pprof | wc -l"
+  register: apiserver_pprof_sa
+
+- name: create sa to access pprof profiles of apiserver
+  block:
+    - name: create sa
+      shell: "oc -n openshift-kube-apiserver create sa apiserver-pprof"
+
+    - name: add cluster-admin clusterrrole
+      shell: "oc create clusterrolebinding pprof-admin --clusterrole cluster-admin --serviceaccount=openshift-kube-apiserver:apiserver-pprof"
+  when: apiserver_pprof_sa.stdout | int == 0
+
+- name: get the bearer token
+  shell: "oc -n openshift-kube-apiserver sa get-token apiserver-pprof"
+  register: bearer_token

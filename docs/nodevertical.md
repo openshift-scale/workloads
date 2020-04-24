@@ -158,7 +158,7 @@ Trigger nodevertical heavy workload. Rather than deploy sleep pods throughout al
 Default: `/ready`
 Readiness probe endpoint for the application deployed by the heavy nodevertical. The default `/ready` endpoint inserts a record with the current timestamp in the ts table of the DDBB. i.e. `INSERT INTO ts VALUES ('2006-01-02T15:04:05Z07:00')`
 
-Be aware that using nodevertical heavy has an extra resource consumption compared with the standard workload, 
+Be aware that using nodevertical heavy has an extra resource consumption compared with the standard workload,
 the following capture provides an idea about how much resources are required to run it.
 
 Results obtained from running 250 pods (client + database) with the default `/ready` endpoint.
@@ -169,6 +169,11 @@ ip-10-0-143-79.us-west-2.compute.internal   755m         10%    8495Mi          
 ip-10-0-155-81.us-west-2.compute.internal   732m         9%     8810Mi          29%       
 ip-10-0-166-82.us-west-2.compute.internal   753m         10%    9116Mi          30%  
 ```
+
+### PPROF_COLLECT
+Default: `false`
+If you'd like to enable pprof profile data collection of kubeapiserver and prometheus through conprof(https://github.com/conprof/conprof).
+Enabling this will create a few services to collect profiles from the apiserver pods and then create a conprof tarball in the pbench tarball
 
 ### NODEVERTICAL_HEAVY_PROBE_PERIOD
 Default: `30`
