@@ -11,8 +11,8 @@ data:
     workload_log "Configuring pbench for NodeVertical"
     mkdir -p /var/lib/pbench-agent/tools-default/
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    source /opt/pbench-agent/profile
     if [ "${ENABLE_PBENCH_AGENTS}" = true ]; then
-      source /opt/pbench-agent/profile
       # clear tools/remotes to make sure there are no invalid remotes
       set +eo pipefail
       pbench-clear-tools

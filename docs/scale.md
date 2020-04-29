@@ -49,7 +49,7 @@ Location of kubeconfig on orchestration host.
 
 ### PBENCH_INSTRUMENTATION
 Default: `false`  
-Enables/disables running the workload wrapped by pbench-user-benchmark. When enabled, pbench agents can then be enabled (`ENABLE_PBENCH_AGENTS`) for further instrumentation data and pbench-copy-results can be enabled (`ENABLE_PBENCH_COPY`) to export captured data for further analysis.
+Enables/disables running the workload wrapped by pbench-user-benchmark. When enabled, pbench agents can then be enabled (`ENABLE_PBENCH_AGENTS`) for further instrumentation data and pbench-copy-results can be enabled (`ENABLE_PBENCH_COPY`) to export captured data for further analysis. Also, we can export the results to the server without enabling (`ENABLE_PBENCH_AGENTS`)
 
 ### ENABLE_PBENCH_AGENTS
 Default: `false`  
