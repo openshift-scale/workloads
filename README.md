@@ -2,6 +2,8 @@
 
 Tool an OpenShift cluster and run OpenShift Performance and Scale Workloads.
 
+**NOTE**: The pbench integration in this repository is not being actively maintained/supported but can be used as is if it serves the need and works without any issues. All the workloads in the repository are being actively maintained/supported. It's recommended to use metrics captured by Prometheus to analyze the results.
+
 ## Documentation, Usage and Examples
 
 [See docs directory](docs/)
