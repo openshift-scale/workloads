@@ -64,7 +64,7 @@ data:
     workload_log "Scaling Duration: $(jq '.duration' ${result_dir}/exit.json)"
     if [ $(jq '.duration>'${EXPECTED_SCALE_DURATION}'' ${result_dir}/exit.json) == "true" ]; then
       workload_log "EXPECTED_SCALE_DURATION (${EXPECTED_SCALE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
-      workload_log "Test Analysis: Failed"
+      workload_log "Test Analysis: Failed due to scale duration taking more time than expected duration"
       exit 1
     fi
     # TODO: Check pbench-agent collected metrics for Pass/Fail

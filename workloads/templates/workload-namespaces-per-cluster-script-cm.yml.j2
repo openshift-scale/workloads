@@ -61,14 +61,14 @@ data:
     workload_log "Checking Cluster Loader Exit Code"
     if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
       workload_log "Cluster Loader Failure"
-      workload_log "Test Analysis: Failed"
+      workload_log "Test Analysis: Failed due to Cluster Loader failure"
       exit 1
     fi
     workload_log "Comparing Namespaces per cluster duration to expected duration"
     workload_log "Namespaces per cluster test Duration: $(jq '.duration' ${result_dir}/exit.json)"
     if [ "$(jq '.duration>'${EXPECTED_NAMESPACES_PER_CLUSTER_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
       workload_log "EXPECTED_NAMESPACES_PER_CLUSTER_DURATION (${EXPECTED_NAMESPACES_PER_CLUSTER_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
-      workload_log "Test Analysis: Failed"
+      workload_log "Test Analysis: Failed due to test run duration taking more time than expected duration"
       exit 1
     fi
     workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"

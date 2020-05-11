@@ -145,7 +145,7 @@ workload_log "Comparing Example duration to expected duration"
 workload_log "Example Duration: $(jq '.duration' ${result_dir}/exit.json)"
 if [ "$(jq '.duration>'${EXPECTED_EXAMPLE_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
   workload_log "EXPECTED_EXAMPLE_DURATION (${EXPECTED_EXAMPLE_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
-  workload_log "Test Analysis: Failed"
+  workload_log "Test Analysis: Failed due to Example duration taking longer than expected duration"
   exit 1
 fi
 # TODO: Check pbench-agent collected metrics for Pass/Fail

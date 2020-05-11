@@ -62,14 +62,14 @@ data:
     workload_log "Checking Cluster Loader Exit Code"
     if [ "$(jq '.exit_code==0' ${result_dir}/exit.json)" = "false" ]; then
       workload_log "Cluster Loader Failure"
-      workload_log "Test Analysis: Failed"
+      workload_log "Test Analysis: Failed due to Cluster Loader failure"
       exit 1
     fi
     workload_log "Comparing PodVertical duration to expected duration"
     workload_log "PodVertical Duration: $(jq '.duration' ${result_dir}/exit.json)"
     if [ "$(jq '.duration>'${EXPECTED_PODVERTICAL_DURATION}'' ${result_dir}/exit.json)" = "true" ]; then
       workload_log "EXPECTED_PODVERTICAL_DURATION (${EXPECTED_PODVERTICAL_DURATION}) exceeded ($(jq '.duration' ${result_dir}/exit.json))"
-      workload_log "Test Analysis: Failed"
+      workload_log "Test Analysis: due to PodVertical run duration taking more time than expected duration"
       exit 1
     fi
     workload_log "Cluster Loader Metrics: $(cat ${result_dir}/clusterloader.json | jq '.')"
