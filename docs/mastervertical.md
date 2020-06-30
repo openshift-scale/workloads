@@ -127,6 +127,11 @@ Basename used by cluster loader for the project(s) it creates.
 Default: `1000`  
 Maximum number of projects that will be created by the mastervertical workload. Typically much higher values are used than the default for large scale tests.
 
+### PPROF_COLLECT
+Default: `false`
+If you'd like to enable pprof profile data collection of kubeapiserver and prometheus through conprof(https://github.com/conprof/conprof).
+Enabling this will create a few services to collect profiles from the apiserver pods and then create a conprof tarball in the pbench tarball
+
 ### EXPECTED_MASTERVERTICAL_DURATION
 Default: `600`  
 Pass/fail criteria. Value to determine if MasterVertical workload executed in duration expected.
