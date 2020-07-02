@@ -24,8 +24,6 @@
       with_items:
         - src: scale-ci-tooling-ns.yml
           dest: "{{ansible_user_dir}}/scale-ci-tooling/scale-ci-tooling-ns.yml"
-        - src: workload-prometheus-script-cm.yml
-          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-script-cm.yml"
 
     - name: Slurp kubeconfig file
       slurp:
@@ -41,6 +39,15 @@
       slurp:
         src: "{{pbench_ssh_public_key_file}}"
       register: pbench_ssh_public_key_file_slurp
+
+    - name: Set cluster details
+      include_role:
+        name: cluster_details
+
+    - name: Collect pprof
+      include_role:
+        name: pprof-collection
+      when: pprof_collect and pprof_collect != ""
 
     - name: Template workload templates
       template:
@@ -58,6 +65,8 @@
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-job.yml"
         - src: workload-env.yml.j2
           dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-env.yml"
+        - src: workload-prometheus-script-cm.yml.j2
+          dest: "{{ansible_user_dir}}/scale-ci-tooling/workload-prometheus-script-cm.yml"
 
     - name: Check if scale-ci-tooling namespace exists
       shell: |

@@ -38,6 +38,14 @@ data:
     fi
     workload_log "Done configuring pbench for Prometheus scale"
 
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Configuring conprof"
+      envsubst < /root/workload/conprof.yaml.template > /tmp/conprof.yaml
+      envsubst < /root/workload/conprof_start.sh > /tmp/conprof_start.sh
+      envsubst < /root/workload/conprof_stop.sh > /tmp/conprof_stop.sh
+      workload_log "Done configuring conprof"
+    fi
+
     workload_log "Running Prometheus scale workload"
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       pbench-user-benchmark --pbench-post='sh /root/workload/post-run.sh' -- sh /root/workload/workload.sh
@@ -53,9 +61,24 @@ data:
       RESULT_DIR=/tmp
     fi
     workload_log "Completed Prometheus scale workload run"
+
+  conprof_start.sh: |
+    #!/bin/sh
+    set -o pipefail
+    nohup /usr/bin/conprof all --config.file /tmp/conprof.yaml --log.level=debug --storage.tsdb.path=/tmp/data &>/tmp/conprof.log &
+  conprof_stop.sh: |
+    #!/bin/sh
+    set -o pipefail
+    pkill conprof
+
   workload.sh: |
     #!/bin/sh
     set -ox pipefail
+
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Starting conprof"
+      bash /tmp/conprof_start.sh
+    fi
 
     db_aging() {
       while true; do
@@ -80,13 +103,22 @@ data:
     # stop the prometheus load
     kill -9 ${loader_pid} ${db_aging_pid}
     
+    if [ "${PPROF_COLLECT}" = "true" ]; then
+      workload_log "Stopping conprof"
+      bash /tmp/conprof_stop.sh
+      cp /tmp/conprof.log ${benchmark_results_dir}/conprof.log
+      cp /tmp/conprof.yaml ${benchmark_results_dir}/conprof.yaml
+      tar -czvf ${benchmark_results_dir}/conprof.tar.gz /tmp/data/
+      workload_log "copied conprof tarballs and log"
+    fi
+
     # test idle
     sleep 300
   post-run.sh: |
     #!/bin/sh
     set -ox pipefail
 
-    RESULT_DIR="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -1)"/1/sample1
+    RESULT_DIR="/var/lib/pbench-agent/$(ls -t /var/lib/pbench-agent/ | grep "pbench-user" | head -1)"/1-default/sample1
     echo "Using RESULT_DIR of: \"${RESULT_DIR}\""
     oc logs -n openshift-monitoring prometheus-k8s-0 -c prometheus --since=${PROMETHEUS_DURATION}s > ${RESULT_DIR}/oc_logs_1.log
     oc logs -n openshift-monitoring prometheus-k8s-1 -c prometheus --since=${PROMETHEUS_DURATION}s > ${RESULT_DIR}/oc_logs_2.log
@@ -463,3 +495,113 @@ data:
     
         def get_dashboards(self):
             return self.dashboards
+  conprof.yaml.template: |
+    scrape_configs:
+    - job_name: 'apiserver0'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver0-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'apiserver1'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver1-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'apiserver2'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['apiserver2-openshift-kube-apiserver.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: true
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false
+    - job_name: 'prometheus'
+      scrape_interval: 30s
+      scrape_timeout: 10m
+      scheme: https
+      tls_config:
+        insecure_skip_verify: true
+      static_configs:
+      - targets: ['prometheus-k8s-openshift-monitoring.apps.{{clustername}}.{{base_domain}}']
+      bearer_token: {{bearer_token.stdout}}
+      profiling_config:
+        pprof_config:
+          heap:
+            enabled: true
+          profile:
+            enabled: false
+          goroutine:
+            enabled: false
+          threadcreate:
+            enabled: false
+          allocs:
+            enabled: false
+          block:
+            enabled: false
+          mutex:
+            enabled: false
+          trace:
+            enabled: false

@@ -98,3 +98,9 @@ Sleep interval for each block iteration in seconds.
 ### PROMETHEUS_SCALE_TEST_PREFIX
 Default: `prometheus-scale`
 Sets the pbench result test prefix.
+
+### PPROF_COLLECT  
+Default: `false`   
+If you'd like to enable pprof profile data collection of kubeapiserver and prometheus through conprof(https://github.com/conprof/conprof).
+Enabling this will create a few services to collect profiles from the apiserver pods and then create a conprof tarball in the pbench tarball
+￼
