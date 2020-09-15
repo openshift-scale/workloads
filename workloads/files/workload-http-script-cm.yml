@@ -1506,16 +1506,16 @@ data:
         port = os.environ["ES_PORT"]
         test_name = os.environ["HTTP_TEST_SUFFIX"]
         test_type = os.environ["test_type"]
-        routes = os.environ["routes"]
-        conn_per_targetroute = os.environ["conn_per_targetroute"]
-        keepalive = os.environ["keepalive"]
+        routes = int(os.environ["routes"])
+        conn_per_targetroute = int(os.environ["conn_per_targetroute"])
+        keepalive = int(os.environ["keepalive"])
         tls_reuse = os.environ["tls_reuse"]
-        delay = os.environ["delay"]
-        runtime = os.environ["runtime"]
-        requests_per_second = os.environ["requests_per_second"]
-        latency_95pctl = os.environ["latency_95pctl"]
+        delay = int(os.environ["delay"])
+        runtime = int(os.environ["runtime"])
+        requests_per_second = float(os.environ["requests_per_second"])
+        latency_95pctl = float(os.environ["latency_95pctl"])
         uuid = os.environ["uuid"]
-        num_workload_generators = os.environ["HTTP_TEST_LOAD_GENERATORS"] 
+        num_workload_generators = float(os.environ["HTTP_TEST_LOAD_GENERATORS"])
         timestamp_newyork = datetime.datetime.now()
         
         documents = _json_payload(uuid, test_type, test_name, routes, conn_per_targetroute, keepalive, tls_reuse, delay, runtime, requests_per_second, latency_95pctl, timestamp_newyork, num_workload_generators)
