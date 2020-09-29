@@ -77,7 +77,7 @@ data:
     if [ "${PBENCH_INSTRUMENTATION}" = "true" ]; then
       result_dir=${benchmark_results_dir}
     fi
-    machinesets=$(oc get machineset -n openshift-machine-api | egrep "\-worker\-|\-w\-" | awk '{print $1}')
+    machinesets=$(oc get machineset -n openshift-machine-api | egrep "\-worker|\-w\-" | awk '{print $1}')
     IFS=$'\n' read -rd '' -a ms_arr <<<"$machinesets"
 
     start_time=$(date +%s)
