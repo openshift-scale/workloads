@@ -607,7 +607,7 @@ data:
           export -p latency_95pctl=$total_latency_95
           echo "95th Percentile Latency =" $total_latency_95
           echo "*******"
-          if [ $ES_SERVER ] && [ $ES_PORT ] ; then 
+          if [ $ES_SERVER ] ; then 
             python3 /root/workload/http_wrapper.py
           fi
         fi
@@ -1494,8 +1494,8 @@ data:
         })
         return processed
 
-    def _index_result(index, server, port, payload):
-        _es_connection_string = str(server) + ':' + str(port)
+    def _index_result(index, server, payload):
+        _es_connection_string = str(server)
         es = elasticsearch.Elasticsearch([_es_connection_string], send_get_body_as='POST')
         for result in payload:
             es.index(index=index, body=result)
@@ -1503,7 +1503,6 @@ data:
     def main():
         
         server = os.environ["ES_SERVER"]
-        port = os.environ["ES_PORT"]
         test_name = os.environ["HTTP_TEST_SUFFIX"]
         test_type = os.environ["test_type"]
         routes = int(os.environ["routes"])
@@ -1520,7 +1519,7 @@ data:
         
         documents = _json_payload(uuid, test_type, test_name, routes, conn_per_targetroute, keepalive, tls_reuse, delay, runtime, requests_per_second, latency_95pctl, timestamp_newyork, num_workload_generators)
         if len(documents) > 0:
-            _index_result("router-test-results", server, port, documents)
+            _index_result("router-test-results", server, documents)
 
 
     if __name__ == '__main__':
