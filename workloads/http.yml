@@ -12,6 +12,8 @@
   vars:
     workload_job: "http"
     workload_job_privileged: "{{enable_pbench_agents}}"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_file }}"
   tasks:
     - name: Create scale-ci-tooling directory
       file:
